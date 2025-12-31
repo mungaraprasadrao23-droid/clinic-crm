@@ -340,15 +340,20 @@ def invoice(patient_id):
 
     file_name = f"invoice_{patient_id}.pdf"
     pdf = canvas.Canvas(file_name, pagesize=(595, 842))  # A4 size
+    PAGE_WIDTH, PAGE_HEIGHT = 595, 842
+LEFT_MARGIN = 50
+RIGHT_MARGIN = PAGE_WIDTH - 50
+TOP_MARGIN = PAGE_HEIGHT - 50
+BOTTOM_MARGIN = 50
 
     # ---------- HEADER ----------
     pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawCentredString(300, 810, "TREATMENT INVOICE")
+    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN, "TREATMENT INVOICE")
 
-    pdf.setFont("Helvetica", 10)
-    pdf.drawCentredString(300, 792, "Dr C Krishnarjuna Rao's Dental Clinic")
-    pdf.drawCentredString(300, 778, "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006")
-    pdf.drawCentredString(300, 764, "Phone: 7794922294")
+    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN - 18, "Dr C Krishnarjuna Rao's Dental Clinic")
+    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN - 34, "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006")
+    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN - 50, "Phone: 7794922294")
+
 
     pdf.line(40, 750, 555, 750)
 
@@ -400,7 +405,7 @@ def invoice(patient_id):
     # ---------- FOOTER ----------
     pdf.line(40, 90, 555, 90)
     pdf.setFont("Helvetica", 9)
-    pdf.drawCentredString(300, 70, "Thank you for visiting our clinic. Get well soon!")
+    pdf.drawCentredString(PAGE_WIDTH / 2, BOTTOM_MARGIN - 10, "Thank you for visiting our clinic. Get well soon!")
 
     pdf.save()
     return send_file(file_name, as_attachment=True)
