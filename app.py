@@ -1,8 +1,21 @@
+def init_users():
+    db = get_db()
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT
+    )
+    """)
+    db.commit()
+
 from flask import Flask, request, send_file, redirect
 import sqlite3
 from reportlab.pdfgen import canvas
 
 app = Flask(__name__)
+init_users()
+
 
 def get_db():
     return sqlite3.connect("clinic.db")
