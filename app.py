@@ -1,3 +1,6 @@
+def get_db():
+    return sqlite3.connect("clinic.db")
+    
 def init_users():
     db = get_db()
     db.execute("""
@@ -16,12 +19,6 @@ from reportlab.pdfgen import canvas
 app = Flask(__name__)
 app.secret_key = "clinic-secret-key"
 init_users()
-
-
-def get_db():
-    return sqlite3.connect("clinic.db")
-
-
 # ---------------- HOME PAGE ----------------
 @app.route("/", methods=["GET", "POST"])
 def home():
