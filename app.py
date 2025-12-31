@@ -14,6 +14,7 @@ import sqlite3
 from reportlab.pdfgen import canvas
 
 app = Flask(__name__)
+app.secret_key = "clinic-secret-key"
 init_users()
 
 
@@ -320,4 +321,37 @@ import os
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    from flask import session, redirect, url_for
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = ""
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        db = get_db()
+        user = db.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password)
+        ).fetchone()
+
+        if user:
+            session["user"] = username
+            return redirect("/")
+        else:
+            error = "Invalid username or password"
+
+    return f"""
+    <h2>Clinic Login</h2>
+    <form method="post">
+        Username:<br>
+        <input name="username" required><br><br>
+        Password:<br>
+        <input type="password" name="password" required><br><br>
+        <button type="submit">Login</button>
+    </form>
+    <p style='color:red;'>{error}</p>
+    """
+
     app.run(host="0.0.0.0", port=port)
