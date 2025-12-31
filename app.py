@@ -320,6 +320,16 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
+@app.route("/create-user")
+def create_user():
+    db = get_db()
+    db.execute(
+        "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
+        ("admin", "admin123")
+    )
+    db.commit()
+    return "Admin user created. Username: admin | Password: admin123"
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = ""
