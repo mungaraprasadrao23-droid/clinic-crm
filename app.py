@@ -29,7 +29,6 @@ app.secret_key = "clinic-secret-key"
 init_users()
 
 
-# ---------------- CREATE FIRST USER ----------------
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -52,17 +51,50 @@ def login():
             error = "Invalid username or password"
 
     return f"""
-    <h2>Clinic Login</h2>
-    <form method="post">
-        Username:<br>
-        <input name="username" required><br><br>
-        Password:<br>
-        <input type="password" name="password" required><br><br>
-        <button type="submit">Login</button>
-    </form>
-    <p style="color:red;">{error}</p>
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+    body {{
+        font-family: Arial;
+        background: #f4f6f8;
+        padding: 20px;
+    }}
+    .box {{
+        max-width: 400px;
+        margin: auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+    }}
+    input, button {{
+        width: 100%;
+        padding: 14px;
+        margin-top: 10px;
+        font-size: 16px;
+    }}
+    button {{
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+    }}
+    </style>
+    </head>
+    <body>
+    <div class="box">
+        <h2 style="text-align:center;">Clinic Login</h2>
+        <form method="post">
+            <input name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button>Login</button>
+        </form>
+        <p style="color:red; text-align:center;">{error}</p>
+    </div>
+    </body>
+    </html>
     """
-
 
 
 @app.route("/logout")
@@ -95,14 +127,13 @@ def home():
     # ADD PATIENT
     if request.method == "POST" and "mobile" in request.form:
         mobile = request.form["mobile"]
-
         existing = db.execute(
             "SELECT id FROM patients WHERE mobile=?",
             (mobile,)
         ).fetchone()
 
         if existing:
-            error = "Mobile number already exists"
+            error = "Mobile already exists"
         else:
             db.execute("""
                 INSERT INTO patients
@@ -121,41 +152,95 @@ def home():
     patients = db.execute("SELECT * FROM patients").fetchall()
 
     html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+    body {{
+        font-family: Arial;
+        background: #f4f6f8;
+        padding: 10px;
+    }}
+    .container {{
+        max-width: 500px;
+        margin: auto;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+    }}
+    h2, h3 {{
+        text-align: center;
+    }}
+    input, select, textarea, button {{
+        width: 100%;
+        padding: 14px;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        font-size: 16px;
+    }}
+    button {{
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+    }}
+    .patient {{
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+    }}
+    a {{
+        display: block;
+        text-align: center;
+        margin-top: 10px;
+    }}
+    </style>
+    </head>
+    <body>
+    <div class="container">
+
     <h2>Clinic CRM</h2>
-    <a href="/logout">Logout</a><br><br>
+    <a href="/logout">Logout</a>
 
     <h3>Search Patient</h3>
     <form method="post">
-        <input name="search_mobile" placeholder="Mobile" required>
+        <input name="search_mobile" placeholder="Mobile Number" required>
         <button>Search</button>
     </form>
-    <p style="color:red;">{error}</p>
+    <p style="color:red; text-align:center;">{error}</p>
 
-    <hr>
     <h3>Add Patient</h3>
     <form method="post">
-        Date: <input type="date" name="appointment_date" required><br><br>
-        Name: <input name="name" required><br><br>
-        Type:
+        <input type="date" name="appointment_date" required>
+        <input name="name" placeholder="Name" required>
         <select name="patient_type">
             <option>New</option>
             <option>Old</option>
-        </select><br><br>
-        Mobile: <input name="mobile" required><br><br>
-        City: <input name="city" required><br><br>
-        Problem:<br>
-        <textarea name="problem" required></textarea><br><br>
-        <button>Save</button>
+        </select>
+        <input name="mobile" placeholder="Mobile" required>
+        <input name="city" placeholder="City" required>
+        <textarea name="problem" placeholder="Problem" required></textarea>
+        <button>Save Patient</button>
     </form>
 
-    <hr>
     <h3>Patient List</h3>
     """
 
     for p in patients:
-        html += f"{p[0]} | {p[2]} | {p[4]} <a href='/patient/{p[0]}'>View</a><br>"
+        html += f"""
+        <div class="patient">
+            <b>{p[2]}</b><br>
+            Mobile: {p[4]}<br>
+            <a href="/patient/{p[0]}">View Patient</a>
+        </div>
+        """
 
-    html += "<br><a href='/export_patients'>Export Excel</a>"
+    html += """
+    <a href="/export_patients">Export Excel</a>
+    </div>
+    </body>
+    </html>
+    """
     return html
 
 
@@ -201,20 +286,18 @@ def patient(patient_id):
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
-    html = f"""
+    return f"""
     <h2>{patient[2]}</h2>
     <a href="/">Back</a><br><br>
 
-    <h3>Treatment</h3>
     <form method="post">
-        <textarea name="plan">{treatment[1] if treatment else ""}</textarea><br>
-        Amount: <input name="amount" value="{final_amount}"><br>
-        Consultant: <input name="consultant"><br>
-        Lab: <input name="lab"><br>
-        <button>Save</button>
+        <textarea name="plan">{treatment[1] if treatment else ""}</textarea>
+        <input name="amount" value="{final_amount}">
+        <input name="consultant" placeholder="Consultant">
+        <input name="lab" placeholder="Lab">
+        <button>Save Treatment</button>
     </form>
 
-    <h3>Add Payment</h3>
     <form method="post">
         <input type="date" name="payment_date" required>
         <input name="payment_amount" required>
@@ -223,17 +306,12 @@ def patient(patient_id):
             <option>UPI</option>
             <option>Card</option>
         </select>
-        <button>Add</button>
+        <button>Add Payment</button>
     </form>
 
-    <hr>
-    Total: {final_amount}<br>
-    Paid: {total_paid}<br>
-    Balance: {balance}<br><br>
-
+    <p>Total: {final_amount} | Paid: {total_paid} | Balance: {balance}</p>
     <a href="/invoice/{patient_id}">Download Invoice</a>
     """
-    return html
 
 
 # ---------------- INVOICE ----------------
