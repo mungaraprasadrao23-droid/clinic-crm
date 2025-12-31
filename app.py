@@ -1,6 +1,15 @@
+from flask import Flask, request, send_file, redirect, session
+import sqlite3
+from reportlab.pdfgen import canvas
+from openpyxl import Workbook
+from datetime import datetime
+import os
+
+# ---------------- DATABASE ----------------
 def get_db():
     return sqlite3.connect("clinic.db")
-    
+
+
 def init_users():
     db = get_db()
     db.execute("""
@@ -12,44 +21,96 @@ def init_users():
     """)
     db.commit()
 
-from flask import Flask, request, send_file, redirect
-import sqlite3
-from reportlab.pdfgen import canvas
 
+# ---------------- APP ----------------
 app = Flask(__name__)
 app.secret_key = "clinic-secret-key"
 init_users()
-# ---------------- HOME PAGE ----------------
+
+
+# ---------------- CREATE FIRST USER ----------------
+@app.route("/create-user")
+def create_user():
+    db = get_db()
+    db.execute(
+        "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
+        ("admin", "admin123")
+    )
+    db.commit()
+    return "Admin user created. Username: admin | Password: admin123"
+
+
+# ---------------- LOGIN ----------------
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = ""
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        db = get_db()
+        user = db.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password)
+        ).fetchone()
+
+        if user:
+            session["user"] = username
+            return redirect("/")
+        else:
+            error = "Invalid username or password"
+
+    return f"""
+    <h2>Clinic Login</h2>
+    <form method="post">
+        Username:<br>
+        <input name="username" required><br><br>
+        Password:<br>
+        <input type="password" name="password" required><br><br>
+        <button type="submit">Login</button>
+    </form>
+    <p style="color:red;">{error}</p>
+    """
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+# ---------------- HOME ----------------
 @app.route("/", methods=["GET", "POST"])
 def home():
+    if "user" not in session:
+        return redirect("/login")
+
     db = get_db()
     error = ""
 
-    # 🔍 SEARCH BY MOBILE
+    # SEARCH
     if request.method == "POST" and "search_mobile" in request.form:
-        search_mobile = request.form["search_mobile"]
-
         patient = db.execute(
             "SELECT id FROM patients WHERE mobile=?",
-            (search_mobile,)
+            (request.form["search_mobile"],)
         ).fetchone()
 
         if patient:
             return redirect(f"/patient/{patient[0]}")
         else:
-            error = "❌ No patient found with this mobile number"
+            error = "No patient found"
 
-    # ➕ ADD NEW PATIENT
+    # ADD PATIENT
     if request.method == "POST" and "mobile" in request.form:
         mobile = request.form["mobile"]
 
         existing = db.execute(
-            "SELECT id, name FROM patients WHERE mobile=?",
+            "SELECT id FROM patients WHERE mobile=?",
             (mobile,)
         ).fetchone()
 
         if existing:
-            error = f"⚠️ Mobile already exists (Patient ID: {existing[0]}, Name: {existing[1]})"
+            error = "Mobile number already exists"
         else:
             db.execute("""
                 INSERT INTO patients
@@ -68,36 +129,31 @@ def home():
     patients = db.execute("SELECT * FROM patients").fetchall()
 
     html = f"""
-    <h2>Search Patient by Mobile</h2>
-    <form method="post">
-        Mobile:
-        <input type="text" name="search_mobile" required>
-        <button type="submit">Search</button>
-    </form>
+    <h2>Clinic CRM</h2>
+    <a href="/logout">Logout</a><br><br>
 
-    <p style="color:red;"><b>{error}</b></p>
+    <h3>Search Patient</h3>
+    <form method="post">
+        <input name="search_mobile" placeholder="Mobile" required>
+        <button>Search</button>
+    </form>
+    <p style="color:red;">{error}</p>
 
     <hr>
-
-    <h2>Add Patient</h2>
-
-<a href="/export_patients">
-    📤 <b>Export Patient List (Excel)</b>
-</a>
-<br><br>
+    <h3>Add Patient</h3>
     <form method="post">
         Date: <input type="date" name="appointment_date" required><br><br>
-        Name: <input type="text" name="name" required><br><br>
+        Name: <input name="name" required><br><br>
         Type:
         <select name="patient_type">
             <option>New</option>
             <option>Old</option>
         </select><br><br>
-        Mobile: <input type="text" name="mobile" required><br><br>
-        City: <input type="text" name="city" required><br><br>
+        Mobile: <input name="mobile" required><br><br>
+        City: <input name="city" required><br><br>
         Problem:<br>
         <textarea name="problem" required></textarea><br><br>
-        <button type="submit">Save</button>
+        <button>Save</button>
     </form>
 
     <hr>
@@ -105,18 +161,18 @@ def home():
     """
 
     for p in patients:
-        html += f"""
-        {p[0]} | {p[2]} | {p[4]}
-        <a href="/patient/{p[0]}">View</a><br>
-        """
+        html += f"{p[0]} | {p[2]} | {p[4]} <a href='/patient/{p[0]}'>View</a><br>"
 
+    html += "<br><a href='/export_patients'>Export Excel</a>"
     return html
 
 
-
-# ---------------- PATIENT PAGE ----------------
+# ---------------- PATIENT ----------------
 @app.route("/patient/<int:patient_id>", methods=["GET", "POST"])
 def patient(patient_id):
+    if "user" not in session:
+        return redirect("/login")
+
     db = get_db()
 
     if request.method == "POST" and "plan" in request.form:
@@ -149,216 +205,92 @@ def patient(patient_id):
     treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
     payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
-    plan = treatment[1] if treatment else ""
     final_amount = treatment[2] if treatment else 0
-    consultant = treatment[3] if treatment else ""
-    lab = treatment[4] if treatment else ""
-
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
     html = f"""
-    <h2>Patient: {patient[2]}</h2>
+    <h2>{patient[2]}</h2>
+    <a href="/">Back</a><br><br>
 
     <h3>Treatment</h3>
     <form method="post">
-        Plan:<br>
-        <textarea name="plan">{plan}</textarea><br>
-        Amount:<br>
-        <input type="number" name="amount" value="{final_amount}"><br>
-        Consultant:<br>
-        <input name="consultant" value="{consultant}"><br>
-        Lab:<br>
-        <input name="lab" value="{lab}"><br><br>
-        <button type="submit">Save Treatment</button>
+        <textarea name="plan">{treatment[1] if treatment else ""}</textarea><br>
+        Amount: <input name="amount" value="{final_amount}"><br>
+        Consultant: <input name="consultant"><br>
+        Lab: <input name="lab"><br>
+        <button>Save</button>
     </form>
 
-    <hr>
     <h3>Add Payment</h3>
     <form method="post">
-        Date: <input type="date" name="payment_date" required>
-        Amount: <input type="number" name="payment_amount" required>
-        Mode:
+        <input type="date" name="payment_date" required>
+        <input name="payment_amount" required>
         <select name="payment_mode">
             <option>Cash</option>
             <option>UPI</option>
             <option>Card</option>
         </select>
-        <button type="submit">Add</button>
+        <button>Add</button>
     </form>
 
-    <h3>Payments</h3>
-    """
-
-    for p in payments:
-        html += f"{p[2]} | {p[3]} | {p[4]}<br>"
-
-    html += f"""
     <hr>
-    <b>Total:</b> {final_amount}<br>
-    <b>Paid:</b> {total_paid}<br>
-    <b>Balance:</b> {balance}<br><br>
+    Total: {final_amount}<br>
+    Paid: {total_paid}<br>
+    Balance: {balance}<br><br>
 
-    <a href="/invoice/{patient_id}">🧾 Print / Download Invoice</a><br><br>
-    <a href="/">⬅ Back</a>
+    <a href="/invoice/{patient_id}">Download Invoice</a>
     """
-
     return html
 
 
-# ---------------- INVOICE PDF ----------------
+# ---------------- INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
 def invoice(patient_id):
     db = get_db()
-
     patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
     treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
     payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
     total_paid = sum(p[3] for p in payments) if payments else 0
-    final_amount = treatment[2]
-    balance = final_amount - total_paid
+    balance = treatment[2] - total_paid
 
     file_name = f"invoice_{patient_id}.pdf"
-    pdf = canvas.Canvas(file_name, pagesize=(595, 842))
-
-    pdf.setFont("Helvetica-Bold", 20)
-    pdf.drawCentredString(300, 810, "TREATMENT INVOICE")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawCentredString(300, 790, "Dr C Krishnarjuna Rao's Dental Clinic")
-
-    pdf.drawString(40, 750, f"Patient Name: {patient[2]}")
-    pdf.drawString(40, 735, f"Mobile: {patient[4]}")
-    pdf.drawString(40, 720, f"City: {patient[5]}")
-
-    pdf.drawString(40, 690, f"Treatment: {treatment[1]}")
-    pdf.drawString(40, 675, f"Final Amount: {final_amount}")
-
-    y = 640
-    for p in payments:
-        pdf.drawString(40, y, f"{p[2]}  {p[3]}  {p[4]}")
-        y -= 15
-
-    pdf.drawString(40, y - 10, f"Total Paid: {total_paid}")
-    pdf.drawString(40, y - 25, f"Balance: {balance}")
-
+    pdf = canvas.Canvas(file_name)
+    pdf.drawString(50, 800, "Clinic Invoice")
+    pdf.drawString(50, 770, f"Patient: {patient[2]}")
+    pdf.drawString(50, 750, f"Total: {treatment[2]}")
+    pdf.drawString(50, 730, f"Paid: {total_paid}")
+    pdf.drawString(50, 710, f"Balance: {balance}")
     pdf.save()
+
     return send_file(file_name, as_attachment=True)
 
-from openpyxl import Workbook
-from datetime import datetime
 
-from openpyxl import Workbook
-from datetime import datetime
-
+# ---------------- EXPORT ----------------
 @app.route("/export_patients")
 def export_patients():
     db = get_db()
-
-    patients = db.execute("""
-        SELECT id, appointment_date, name, mobile, city
-        FROM patients
-        ORDER BY appointment_date DESC
-    """).fetchall()
+    patients = db.execute("SELECT id, appointment_date, name, mobile, city FROM patients").fetchall()
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Patients Report"
-
-    headers = [
-        "Appointment Date",
-        "Patient Name",
-        "Mobile",
-        "City",
-        "Final Amount",
-        "Total Paid",
-        "Balance"
-    ]
-    ws.append(headers)
+    ws.append(["Date", "Name", "Mobile", "City", "Total", "Paid", "Balance"])
 
     for p in patients:
-        patient_id = p[0]
+        pid = p[0]
+        t = db.execute("SELECT final_amount FROM treatment WHERE patient_id=?", (pid,)).fetchone()
+        pay = db.execute("SELECT SUM(amount) FROM payments WHERE patient_id=?", (pid,)).fetchone()
+        total = t[0] if t else 0
+        paid = pay[0] if pay[0] else 0
+        ws.append([p[1], p[2], p[3], p[4], total, paid, total - paid])
 
-        # Get treatment amount
-        treatment = db.execute(
-            "SELECT final_amount FROM treatment WHERE patient_id=?",
-            (patient_id,)
-        ).fetchone()
-
-        final_amount = treatment[0] if treatment else 0
-
-        # Get total paid
-        payments = db.execute(
-            "SELECT SUM(amount) FROM payments WHERE patient_id=?",
-            (patient_id,)
-        ).fetchone()
-
-        total_paid = payments[0] if payments[0] else 0
-
-        balance = final_amount - total_paid
-
-        ws.append([
-            p[1],      # Date
-            p[2],      # Name
-            p[3],      # Mobile
-            p[4],      # City
-            final_amount,
-            total_paid,
-            balance
-        ])
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    file_name = f"patients_financial_report_{today}.xlsx"
-    wb.save(file_name)
-
-    return send_file(file_name, as_attachment=True)
+    fname = f"patients_{datetime.now().date()}.xlsx"
+    wb.save(fname)
+    return send_file(fname, as_attachment=True)
 
 
-import os
-
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-@app.route("/create-user")
-def create_user():
-    db = get_db()
-    db.execute(
-        "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
-        ("admin", "admin123")
-    )
-    db.commit()
-    return "Admin user created. Username: admin | Password: admin123"
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    error = ""
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-
-        db = get_db()
-        user = db.execute(
-            "SELECT * FROM users WHERE username=? AND password=?",
-            (username, password)
-        ).fetchone()
-
-        if user:
-            session["user"] = username
-            return redirect("/")
-        else:
-            error = "Invalid username or password"
-
-    return f"""
-    <h2>Clinic Login</h2>
-    <form method="post">
-        Username:<br>
-        <input name="username" required><br><br>
-        Password:<br>
-        <input type="password" name="password" required><br><br>
-        <button type="submit">Login</button>
-    </form>
-    <p style='color:red;'>{error}</p>
-    """
-
     app.run(host="0.0.0.0", port=port)
