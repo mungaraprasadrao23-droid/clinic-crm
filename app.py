@@ -33,7 +33,7 @@ app = Flask(__name__)
 app.secret_key = "clinic-secret-key"
 
 # ✅ auto-create admin safely
-init_admin()
+#init_admin()
 
 
 # ---------------- LOGIN ----------------
