@@ -311,6 +311,58 @@ def patient(patient_id):
     """
 
     return html
+# ---------------- INVOICE PAGE ----------------
+@app.route("/invoice/<int:patient_id>")
+def invoice(patient_id):
+    if "user" not in session:
+        return redirect("/login")
+
+    db = get_db()
+
+    patient = db.execute(
+        "SELECT * FROM patients WHERE id=?",
+        (patient_id,)
+    ).fetchone()
+
+    treatment = db.execute(
+        "SELECT * FROM treatment WHERE patient_id=?",
+        (patient_id,)
+    ).fetchone()
+
+    payments = db.execute(
+        "SELECT * FROM payments WHERE patient_id=?",
+        (patient_id,)
+    ).fetchall()
+
+    final_amount = treatment[2] if treatment else 0
+    total_paid = sum(p[3] for p in payments) if payments else 0
+    balance = final_amount - total_paid
+
+    file_name = f"invoice_{patient_id}.pdf"
+    pdf = canvas.Canvas(file_name)
+
+    pdf.setFont("Helvetica-Bold", 18)
+    pdf.drawString(50, 800, "CLINIC INVOICE")
+
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(50, 770, f"Patient Name: {patient[2]}")
+    pdf.drawString(50, 755, f"Mobile: {patient[4]}")
+    pdf.drawString(50, 740, f"City: {patient[5]}")
+
+    pdf.drawString(50, 710, f"Treatment Plan: {treatment[1] if treatment else ''}")
+    pdf.drawString(50, 695, f"Final Amount: {final_amount}")
+
+    pdf.drawString(50, 665, "Payments")
+    y = 645
+    for p in payments:
+        pdf.drawString(50, y, f"{p[2]} | {p[3]} | {p[4]}")
+        y -= 15
+
+    pdf.drawString(50, y - 10, f"Total Paid: {total_paid}")
+    pdf.drawString(50, y - 25, f"Balance: {balance}")
+
+    pdf.save()
+    return send_file(file_name, as_attachment=True)
 
 
 
