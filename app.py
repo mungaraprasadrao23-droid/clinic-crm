@@ -33,13 +33,13 @@ init_users()
 @app.route("/create-user")
 def create_user():
     db = get_db()
+    hashed_password = generate_password_hash("admin123")
     db.execute(
         "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
-        ("admin", "admin123")
+        ("admin", hashed_password)
     )
     db.commit()
-    return "Admin user created. Username: admin | Password: admin123"
-
+    return "Admin user created securely. Username: admin | Password: admin123"
 
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
