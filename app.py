@@ -311,7 +311,7 @@ def patient(patient_id):
     """
 
     return html
-# ---------------- INVOICE PAGE ----------------
+# ---------------- PROFESSIONAL INVOICE (PDF) ----------------
 @app.route("/invoice/<int:patient_id>")
 def invoice(patient_id):
     if "user" not in session:
@@ -339,27 +339,68 @@ def invoice(patient_id):
     balance = final_amount - total_paid
 
     file_name = f"invoice_{patient_id}.pdf"
-    pdf = canvas.Canvas(file_name)
+    pdf = canvas.Canvas(file_name, pagesize=(595, 842))  # A4 size
 
+    # ---------- HEADER ----------
     pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawString(50, 800, "CLINIC INVOICE")
+    pdf.drawCentredString(300, 810, "TREATMENT INVOICE")
 
-    pdf.setFont("Helvetica", 11)
-    pdf.drawString(50, 770, f"Patient Name: {patient[2]}")
-    pdf.drawString(50, 755, f"Mobile: {patient[4]}")
-    pdf.drawString(50, 740, f"City: {patient[5]}")
+    pdf.setFont("Helvetica", 10)
+    pdf.drawCentredString(300, 792, "Dr C Krishnarjuna Rao's Dental Clinic")
+    pdf.drawCentredString(300, 778, "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006")
+    pdf.drawCentredString(300, 764, "Phone: 7794922294")
 
-    pdf.drawString(50, 710, f"Treatment Plan: {treatment[1] if treatment else ''}")
-    pdf.drawString(50, 695, f"Final Amount: {final_amount}")
+    pdf.line(40, 750, 555, 750)
 
-    pdf.drawString(50, 665, "Payments")
-    y = 645
+    # ---------- PATIENT DETAILS ----------
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(40, 725, "Patient Details")
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(40, 705, f"Patient Name : {patient[2]}")
+    pdf.drawString(40, 690, f"Mobile       : {patient[4]}")
+    pdf.drawString(40, 675, f"City         : {patient[5]}")
+    pdf.drawString(40, 660, f"Problem      : {patient[6]}")
+
+    # ---------- TREATMENT DETAILS ----------
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(40, 630, "Treatment Details")
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(40, 610, f"Treatment Plan : {treatment[1] if treatment else ''}")
+    pdf.drawString(40, 595, f"Consultant     : {treatment[3] if treatment else ''}")
+    pdf.drawString(40, 580, f"Lab Incharge   : {treatment[4] if treatment else ''}")
+    pdf.drawString(40, 565, f"Final Amount   : {final_amount}")
+
+    # ---------- PAYMENTS TABLE ----------
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(40, 535, "Payment Details")
+
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(40, 515, "Date")
+    pdf.drawString(220, 515, "Mode")
+    pdf.drawString(400, 515, "Amount")
+    pdf.line(40, 510, 555, 510)
+
+    pdf.setFont("Helvetica", 10)
+    y = 495
     for p in payments:
-        pdf.drawString(50, y, f"{p[2]} | {p[3]} | {p[4]}")
-        y -= 15
+        pdf.drawString(40, y, p[2])
+        pdf.drawString(220, y, p[4])
+        pdf.drawRightString(520, y, str(p[3]))
+        y -= 18
 
-    pdf.drawString(50, y - 10, f"Total Paid: {total_paid}")
-    pdf.drawString(50, y - 25, f"Balance: {balance}")
+    # ---------- TOTALS ----------
+    pdf.line(300, y - 5, 555, y - 5)
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawRightString(520, y - 25, f"Total Amount : {final_amount}")
+    pdf.drawRightString(520, y - 40, f"Total Paid   : {total_paid}")
+    pdf.drawRightString(520, y - 55, f"Balance      : {balance}")
+
+    # ---------- FOOTER ----------
+    pdf.line(40, 90, 555, 90)
+    pdf.setFont("Helvetica", 9)
+    pdf.drawCentredString(300, 70, "Thank you for visiting our clinic. Get well soon!")
 
     pdf.save()
     return send_file(file_name, as_attachment=True)
