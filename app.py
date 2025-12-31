@@ -45,23 +45,18 @@ def create_user():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = ""
+
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
 
         db = get_db()
         user = db.execute(
-    "SELECT * FROM users WHERE username=?",
-    (username,)
-).fetchone()
+            "SELECT * FROM users WHERE username=?",
+            (username,)
+        ).fetchone()
 
-if user and check_password_hash(user[2], password):
-    session["user"] = username
-    return redirect("/")
-else:
-    error = "Invalid username or password"
-
-        if user:
+        if user and check_password_hash(user[2], password):
             session["user"] = username
             return redirect("/")
         else:
@@ -78,6 +73,7 @@ else:
     </form>
     <p style="color:red;">{error}</p>
     """
+
 
 
 @app.route("/logout")
