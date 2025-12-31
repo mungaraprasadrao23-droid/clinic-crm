@@ -1,4 +1,5 @@
 from flask import Flask, request, send_file, redirect, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from reportlab.pdfgen import canvas
 from openpyxl import Workbook
