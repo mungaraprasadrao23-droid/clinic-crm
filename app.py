@@ -11,7 +11,7 @@ def get_db():
     return sqlite3.connect("clinic.db")
 
 
-def init_users():
+def init_admin():
     db = get_db()
     db.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -20,7 +20,15 @@ def init_users():
         password TEXT
     )
     """)
+    hashed = generate_password_hash("admin123")
+    db.execute(
+        "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
+        ("admin", hashed)
+    )
     db.commit()
+
+init_admin()
+
 
 
 # ---------------- APP ----------------
