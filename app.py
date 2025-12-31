@@ -207,6 +207,111 @@ def home():
 
     html += "<br><a href='/export_patients'>Export Excel</a>"
     return html
+    # ---------------- PATIENT PAGE ----------------
+@app.route("/patient/<int:patient_id>", methods=["GET", "POST"])
+def patient(patient_id):
+    if "user" not in session:
+        return redirect("/login")
+
+    db = get_db()
+
+    # SAVE TREATMENT
+    if request.method == "POST" and "plan" in request.form:
+        db.execute("""
+        INSERT OR REPLACE INTO treatment
+        (patient_id, plan, final_amount, consultant, lab)
+        VALUES (?, ?, ?, ?, ?)
+        """, (
+            patient_id,
+            request.form["plan"],
+            request.form["amount"],
+            request.form["consultant"],
+            request.form["lab"]
+        ))
+        db.commit()
+
+    # SAVE PAYMENT
+    if request.method == "POST" and "payment_amount" in request.form:
+        db.execute("""
+        INSERT INTO payments (patient_id, payment_date, amount, mode)
+        VALUES (?, ?, ?, ?)
+        """, (
+            patient_id,
+            request.form["payment_date"],
+            request.form["payment_amount"],
+            request.form["payment_mode"]
+        ))
+        db.commit()
+
+    patient = db.execute(
+        "SELECT * FROM patients WHERE id=?",
+        (patient_id,)
+    ).fetchone()
+
+    treatment = db.execute(
+        "SELECT * FROM treatment WHERE patient_id=?",
+        (patient_id,)
+    ).fetchone()
+
+    payments = db.execute(
+        "SELECT * FROM payments WHERE patient_id=?",
+        (patient_id,)
+    ).fetchall()
+
+    final_amount = treatment[2] if treatment else 0
+    total_paid = sum(p[3] for p in payments) if payments else 0
+    balance = final_amount - total_paid
+
+    html = f"""
+    <h2>Patient: {patient[2]}</h2>
+    <a href="/">⬅ Back</a><br><br>
+
+    <h3>Treatment</h3>
+    <form method="post">
+        <textarea name="plan" placeholder="Treatment Plan">{treatment[1] if treatment else ""}</textarea><br><br>
+        Final Amount:<br>
+        <input name="amount" value="{final_amount}"><br><br>
+        Consultant:<br>
+        <input name="consultant"><br><br>
+        Lab:<br>
+        <input name="lab"><br><br>
+        <button type="submit">Save Treatment</button>
+    </form>
+
+    <hr>
+
+    <h3>Add Payment</h3>
+    <form method="post">
+        Date:<br>
+        <input type="date" name="payment_date" required><br><br>
+        Amount:<br>
+        <input name="payment_amount" required><br><br>
+        Mode:<br>
+        <select name="payment_mode">
+            <option>Cash</option>
+            <option>UPI</option>
+            <option>Card</option>
+        </select><br><br>
+        <button type="submit">Add Payment</button>
+    </form>
+
+    <h3>Payments</h3>
+    """
+
+    for p in payments:
+        html += f"{p[2]} | {p[3]} | {p[4]}<br>"
+
+    html += f"""
+    <hr>
+    <b>Total Amount:</b> {final_amount}<br>
+    <b>Total Paid:</b> {total_paid}<br>
+    <b>Balance:</b> {balance}<br><br>
+
+    <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
+    """
+
+    return html
+
 
 
 # ---------------- RUN ----------------
