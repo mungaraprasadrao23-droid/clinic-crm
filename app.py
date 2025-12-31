@@ -11,8 +11,10 @@ def get_db():
     return sqlite3.connect("clinic.db")
 
 
-def init_admin():
+def init_db():
     db = get_db()
+
+    # USERS
     db.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,6 +22,47 @@ def init_admin():
         password TEXT
     )
     """)
+
+    # PATIENTS
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS patients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        appointment_date TEXT,
+        name TEXT,
+        patient_type TEXT,
+        mobile TEXT UNIQUE,
+        city TEXT,
+        problem TEXT
+    )
+    """)
+
+    # TREATMENT
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS treatment (
+        patient_id INTEGER PRIMARY KEY,
+        plan TEXT,
+        final_amount INTEGER,
+        consultant TEXT,
+        lab TEXT
+    )
+    """)
+
+    # PAYMENTS
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER,
+        payment_date TEXT,
+        amount INTEGER,
+        mode TEXT
+    )
+    """)
+
+    db.commit()
+
+
+def init_admin():
+    db = get_db()
     hashed = generate_password_hash("admin123")
     db.execute(
         "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
@@ -28,12 +71,13 @@ def init_admin():
     db.commit()
 
 
+# ---------------- INIT ----------------
+init_db()
+init_admin()
+
 # ---------------- APP ----------------
 app = Flask(__name__)
 app.secret_key = "clinic-secret-key"
-
-# ✅ auto-create admin safely
-#init_admin()
 
 
 # ---------------- LOGIN ----------------
@@ -42,12 +86,12 @@ def login():
     error = ""
 
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+        username = request.form.get("username")
+        password = request.form.get("password")
 
         db = get_db()
         user = db.execute(
-            "SELECT * FROM users WHERE username=?",
+            "SELECT id, username, password FROM users WHERE username=?",
             (username,)
         ).fetchone()
 
@@ -63,30 +107,10 @@ def login():
     <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-    body {{
-        font-family: Arial;
-        background: #f4f6f8;
-        padding: 20px;
-    }}
-    .box {{
-        max-width: 400px;
-        margin: auto;
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-    }}
-    input, button {{
-        width: 100%;
-        padding: 14px;
-        margin-top: 10px;
-        font-size: 16px;
-    }}
-    button {{
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-    }}
+    body {{ font-family: Arial; background:#f4f6f8; padding:20px; }}
+    .box {{ max-width:400px; margin:auto; background:white; padding:20px; border-radius:8px; }}
+    input,button {{ width:100%; padding:14px; margin-top:10px; font-size:16px; }}
+    button {{ background:#007bff; color:white; border:none; border-radius:6px; }}
     </style>
     </head>
     <body>
@@ -124,7 +148,6 @@ def home():
             "SELECT id FROM patients WHERE mobile=?",
             (request.form["search_mobile"],)
         ).fetchone()
-
         if patient:
             return redirect(f"/patient/{patient[0]}")
         else:
@@ -132,14 +155,7 @@ def home():
 
     if request.method == "POST" and "mobile" in request.form:
         mobile = request.form["mobile"]
-        existing = db.execute(
-            "SELECT id FROM patients WHERE mobile=?",
-            (mobile,)
-        ).fetchone()
-
-        if existing:
-            error = "Mobile already exists"
-        else:
+        try:
             db.execute("""
                 INSERT INTO patients
                 (appointment_date, name, patient_type, mobile, city, problem)
@@ -153,49 +169,14 @@ def home():
                 request.form["problem"]
             ))
             db.commit()
+        except:
+            error = "Mobile already exists"
 
     patients = db.execute("SELECT * FROM patients").fetchall()
 
     html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-    body {{
-        font-family: Arial;
-        background: #f4f6f8;
-        padding: 10px;
-    }}
-    .container {{
-        max-width: 500px;
-        margin: auto;
-        background: white;
-        padding: 15px;
-        border-radius: 8px;
-    }}
-    input, select, textarea, button {{
-        width: 100%;
-        padding: 14px;
-        margin-bottom: 12px;
-        font-size: 16px;
-    }}
-    button {{
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-    }}
-    .patient {{
-        padding: 10px;
-        border-bottom: 1px solid #ddd;
-    }}
-    </style>
-    </head>
-    <body>
-    <div class="container">
     <h2>Clinic CRM</h2>
-    <a href="/logout">Logout</a>
+    <a href="/logout">Logout</a><br><br>
 
     <form method="post">
         <input name="search_mobile" placeholder="Search Mobile" required>
@@ -218,19 +199,13 @@ def home():
 
     for p in patients:
         html += f"""
-        <div class="patient">
-            <b>{p[2]}</b><br>
-            {p[4]}<br>
+        <div>
+            <b>{p[2]}</b> | {p[4]}
             <a href="/patient/{p[0]}">View</a>
         </div>
         """
 
-    html += """
-    <a href="/export_patients">Export Excel</a>
-    </div>
-    </body>
-    </html>
-    """
+    html += "<br><a href='/export_patients'>Export Excel</a>"
     return html
 
 
