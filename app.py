@@ -318,7 +318,7 @@ import os
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    from flask import session, redirect, url_for
+    app.run(host="0.0.0.0", port=port)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
