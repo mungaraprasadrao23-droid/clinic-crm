@@ -14,7 +14,6 @@ def get_db():
 def init_db():
     db = get_db()
 
-    # USERS
     db.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +22,6 @@ def init_db():
     )
     """)
 
-    # PATIENTS
     db.execute("""
     CREATE TABLE IF NOT EXISTS patients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +34,6 @@ def init_db():
     )
     """)
 
-    # TREATMENT
     db.execute("""
     CREATE TABLE IF NOT EXISTS treatment (
         patient_id INTEGER PRIMARY KEY,
@@ -47,7 +44,6 @@ def init_db():
     )
     """)
 
-    # PAYMENTS
     db.execute("""
     CREATE TABLE IF NOT EXISTS payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +87,7 @@ def login():
 
         db = get_db()
         user = db.execute(
-            "SELECT id, username, password FROM users WHERE username=?",
+            "SELECT * FROM users WHERE username=?",
             (username,)
         ).fetchone()
 
@@ -102,29 +98,13 @@ def login():
             error = "Invalid username or password"
 
     return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-    body {{ font-family: Arial; background:#f4f6f8; padding:20px; }}
-    .box {{ max-width:400px; margin:auto; background:white; padding:20px; border-radius:8px; }}
-    input,button {{ width:100%; padding:14px; margin-top:10px; font-size:16px; }}
-    button {{ background:#007bff; color:white; border:none; border-radius:6px; }}
-    </style>
-    </head>
-    <body>
-    <div class="box">
-        <h2 style="text-align:center;">Clinic Login</h2>
-        <form method="post">
-            <input name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button>Login</button>
-        </form>
-        <p style="color:red; text-align:center;">{error}</p>
-    </div>
-    </body>
-    </html>
+    <h2>Clinic Login</h2>
+    <form method="post">
+        <input name="username" placeholder="Username" required><br><br>
+        <input type="password" name="password" placeholder="Password" required><br><br>
+        <button>Login</button>
+    </form>
+    <p style="color:red;">{error}</p>
     """
 
 
@@ -154,7 +134,6 @@ def home():
             error = "No patient found"
 
     if request.method == "POST" and "mobile" in request.form:
-        mobile = request.form["mobile"]
         try:
             db.execute("""
                 INSERT INTO patients
@@ -164,7 +143,7 @@ def home():
                 request.form["appointment_date"],
                 request.form["name"],
                 request.form["patient_type"],
-                mobile,
+                request.form["mobile"],
                 request.form["city"],
                 request.form["problem"]
             ))
@@ -185,12 +164,15 @@ def home():
     <p style="color:red;">{error}</p>
 
     <form method="post">
-        <input type="date" name="appointment_date" required>
-        <input name="name" placeholder="Name" required>
-        <select name="patient_type"><option>New</option><option>Old</option></select>
-        <input name="mobile" placeholder="Mobile" required>
-        <input name="city" placeholder="City" required>
-        <textarea name="problem" placeholder="Problem" required></textarea>
+        <input type="date" name="appointment_date" required><br><br>
+        <input name="name" placeholder="Name" required><br><br>
+        <select name="patient_type">
+            <option>New</option>
+            <option>Old</option>
+        </select><br><br>
+        <input name="mobile" placeholder="Mobile" required><br><br>
+        <input name="city" placeholder="City" required><br><br>
+        <textarea name="problem" placeholder="Problem" required></textarea><br><br>
         <button>Add Patient</button>
     </form>
 
@@ -207,7 +189,9 @@ def home():
 
     html += "<br><a href='/export_patients'>Export Excel</a>"
     return html
-    # ---------------- PATIENT PAGE ----------------
+
+
+# ---------------- PATIENT ----------------
 @app.route("/patient/<int:patient_id>", methods=["GET", "POST"])
 def patient(patient_id):
     if "user" not in session:
@@ -215,7 +199,6 @@ def patient(patient_id):
 
     db = get_db()
 
-    # SAVE TREATMENT
     if request.method == "POST" and "plan" in request.form:
         db.execute("""
         INSERT OR REPLACE INTO treatment
@@ -230,7 +213,6 @@ def patient(patient_id):
         ))
         db.commit()
 
-    # SAVE PAYMENT
     if request.method == "POST" and "payment_amount" in request.form:
         db.execute("""
         INSERT INTO payments (patient_id, payment_date, amount, mode)
@@ -243,173 +225,103 @@ def patient(patient_id):
         ))
         db.commit()
 
-    patient = db.execute(
-        "SELECT * FROM patients WHERE id=?",
-        (patient_id,)
-    ).fetchone()
-
-    treatment = db.execute(
-        "SELECT * FROM treatment WHERE patient_id=?",
-        (patient_id,)
-    ).fetchone()
-
-    payments = db.execute(
-        "SELECT * FROM payments WHERE patient_id=?",
-        (patient_id,)
-    ).fetchall()
+    patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
+    treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
     html = f"""
-    <h2>Patient: {patient[2]}</h2>
+    <h2>{patient[2]}</h2>
     <a href="/">⬅ Back</a><br><br>
 
     <h3>Treatment</h3>
     <form method="post">
-        <textarea name="plan" placeholder="Treatment Plan">{treatment[1] if treatment else ""}</textarea><br><br>
-        Final Amount:<br>
+        <textarea name="plan">{treatment[1] if treatment else ""}</textarea><br><br>
         <input name="amount" value="{final_amount}"><br><br>
-        Consultant:<br>
-        <input name="consultant"><br><br>
-        Lab:<br>
-        <input name="lab"><br><br>
-        <button type="submit">Save Treatment</button>
+        <input name="consultant" placeholder="Consultant"><br><br>
+        <input name="lab" placeholder="Lab"><br><br>
+        <button>Save Treatment</button>
     </form>
-
-    <hr>
 
     <h3>Add Payment</h3>
     <form method="post">
-        Date:<br>
         <input type="date" name="payment_date" required><br><br>
-        Amount:<br>
         <input name="payment_amount" required><br><br>
-        Mode:<br>
         <select name="payment_mode">
             <option>Cash</option>
             <option>UPI</option>
             <option>Card</option>
         </select><br><br>
-        <button type="submit">Add Payment</button>
+        <button>Add Payment</button>
     </form>
 
-    <h3>Payments</h3>
-    """
-
-    for p in payments:
-        html += f"{p[2]} | {p[3]} | {p[4]}<br>"
-
-    html += f"""
-    <hr>
-    <b>Total Amount:</b> {final_amount}<br>
-    <b>Total Paid:</b> {total_paid}<br>
-    <b>Balance:</b> {balance}<br><br>
-
+    <p>Total: {final_amount} | Paid: {total_paid} | Balance: {balance}</p>
     <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
     """
-
     return html
-# ---------------- PROFESSIONAL INVOICE (PDF) ----------------
+
+
+# ---------------- INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
 def invoice(patient_id):
     if "user" not in session:
         return redirect("/login")
 
     db = get_db()
-
-    patient = db.execute(
-        "SELECT * FROM patients WHERE id=?",
-        (patient_id,)
-    ).fetchone()
-
-    treatment = db.execute(
-        "SELECT * FROM treatment WHERE patient_id=?",
-        (patient_id,)
-    ).fetchone()
-
-    payments = db.execute(
-        "SELECT * FROM payments WHERE patient_id=?",
-        (patient_id,)
-    ).fetchall()
+    patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
+    treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
     file_name = f"invoice_{patient_id}.pdf"
-    pdf = canvas.Canvas(file_name, pagesize=(595, 842))  # A4 size
-    PAGE_WIDTH, PAGE_HEIGHT = 595, 842
-LEFT_MARGIN = 50
-RIGHT_MARGIN = PAGE_WIDTH - 50
-TOP_MARGIN = PAGE_HEIGHT - 50
-BOTTOM_MARGIN = 50
+    pdf = canvas.Canvas(file_name, pagesize=(595, 842))
 
-    # ---------- HEADER ----------
     pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN, "TREATMENT INVOICE")
-
-    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN - 18, "Dr C Krishnarjuna Rao's Dental Clinic")
-    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN - 34, "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006")
-    pdf.drawCentredString(PAGE_WIDTH / 2, TOP_MARGIN - 50, "Phone: 7794922294")
-
-
-    pdf.line(40, 750, 555, 750)
-
-    # ---------- PATIENT DETAILS ----------
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(40, 725, "Patient Details")
+    pdf.drawCentredString(300, 800, "TREATMENT INVOICE")
 
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(40, 705, f"Patient Name : {patient[2]}")
-    pdf.drawString(40, 690, f"Mobile       : {patient[4]}")
-    pdf.drawString(40, 675, f"City         : {patient[5]}")
-    pdf.drawString(40, 660, f"Problem      : {patient[6]}")
+    pdf.drawString(40, 760, f"Patient: {patient[2]}")
+    pdf.drawString(40, 740, f"Mobile: {patient[4]}")
 
-    # ---------- TREATMENT DETAILS ----------
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(40, 630, "Treatment Details")
-
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(40, 610, f"Treatment Plan : {treatment[1] if treatment else ''}")
-    pdf.drawString(40, 595, f"Consultant     : {treatment[3] if treatment else ''}")
-    pdf.drawString(40, 580, f"Lab Incharge   : {treatment[4] if treatment else ''}")
-    pdf.drawString(40, 565, f"Final Amount   : {final_amount}")
-
-    # ---------- PAYMENTS TABLE ----------
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(40, 535, "Payment Details")
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(40, 515, "Date")
-    pdf.drawString(220, 515, "Mode")
-    pdf.drawString(400, 515, "Amount")
-    pdf.line(40, 510, 555, 510)
-
-    pdf.setFont("Helvetica", 10)
-    y = 495
+    y = 700
     for p in payments:
-        pdf.drawString(40, y, p[2])
-        pdf.drawString(220, y, p[4])
-        pdf.drawRightString(520, y, str(p[3]))
+        pdf.drawString(40, y, f"{p[2]} | {p[4]} | {p[3]}")
         y -= 18
 
-    # ---------- TOTALS ----------
-    pdf.line(300, y - 5, 555, y - 5)
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawRightString(520, y - 25, f"Total Amount : {final_amount}")
-    pdf.drawRightString(520, y - 40, f"Total Paid   : {total_paid}")
-    pdf.drawRightString(520, y - 55, f"Balance      : {balance}")
-
-    # ---------- FOOTER ----------
-    pdf.line(40, 90, 555, 90)
-    pdf.setFont("Helvetica", 9)
-    pdf.drawCentredString(PAGE_WIDTH / 2, BOTTOM_MARGIN - 10, "Thank you for visiting our clinic. Get well soon!")
+    pdf.drawString(40, y - 20, f"Total: {final_amount}")
+    pdf.drawString(40, y - 40, f"Paid: {total_paid}")
+    pdf.drawString(40, y - 60, f"Balance: {balance}")
 
     pdf.save()
     return send_file(file_name, as_attachment=True)
 
+
+# ---------------- EXPORT ----------------
+@app.route("/export_patients")
+def export_patients():
+    db = get_db()
+    patients = db.execute("SELECT id, appointment_date, name, mobile, city FROM patients").fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Date", "Name", "Mobile", "City", "Total", "Paid", "Balance"])
+
+    for p in patients:
+        t = db.execute("SELECT final_amount FROM treatment WHERE patient_id=?", (p[0],)).fetchone()
+        pay = db.execute("SELECT SUM(amount) FROM payments WHERE patient_id=?", (p[0],)).fetchone()
+        total = t[0] if t else 0
+        paid = pay[0] if pay[0] else 0
+        ws.append([p[1], p[2], p[3], p[4], total, paid, total - paid])
+
+    fname = f"patients_{datetime.now().date()}.xlsx"
+    wb.save(fname)
+    return send_file(fname, as_attachment=True)
 
 
 # ---------------- RUN ----------------
