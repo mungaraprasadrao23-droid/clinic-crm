@@ -456,6 +456,47 @@ def export_patients():
     wb.save(file_name)
 
     return send_file(file_name, as_attachment=True)
+# ---------------- EXPORT PAYMENTS TO EXCEL ----------------
+@app.route("/export_payments")
+def export_payments():
+    if "user" not in session:
+        return redirect("/login")
+
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT
+            patients.name,
+            patients.mobile,
+            payments.payment_date,
+            payments.mode,
+            payments.amount
+        FROM payments
+        JOIN patients ON patients.id = payments.patient_id
+        ORDER BY payments.payment_date DESC
+    """).fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Payments"
+
+    # Header row
+    ws.append([
+        "Patient Name",
+        "Mobile",
+        "Payment Date",
+        "Payment Mode",
+        "Amount Paid"
+    ])
+
+    # Data rows
+    for r in rows:
+        ws.append(r)
+
+    file_name = "payment_report.xlsx"
+    wb.save(file_name)
+
+    return send_file(file_name, as_attachment=True)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
