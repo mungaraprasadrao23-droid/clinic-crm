@@ -271,58 +271,110 @@ def invoice(patient_id):
         return redirect("/login")
 
     db = get_db()
-    patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
-    treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
-    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
+
+    patient = db.execute(
+        "SELECT * FROM patients WHERE id=?",
+        (patient_id,)
+    ).fetchone()
+
+    treatment = db.execute(
+        "SELECT * FROM treatment WHERE patient_id=?",
+        (patient_id,)
+    ).fetchone()
+
+    payments = db.execute(
+        "SELECT * FROM payments WHERE patient_id=?",
+        (patient_id,)
+    ).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
     file_name = f"invoice_{patient_id}.pdf"
-    pdf = canvas.Canvas(file_name, pagesize=(595, 842))
+    pdf = canvas.Canvas(file_name, pagesize=(595, 842))  # A4
 
+    PAGE_WIDTH = 595
+    PAGE_HEIGHT = 842
+    LEFT = 40
+    RIGHT = PAGE_WIDTH - 40
+    TOP = PAGE_HEIGHT - 40
+    BOTTOM = 40
+
+    # -------- HEADER --------
     pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawCentredString(300, 800, "TREATMENT INVOICE")
+    pdf.drawCentredString(PAGE_WIDTH / 2, TOP, "TREATMENT INVOICE")
 
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(40, 760, f"Patient: {patient[2]}")
-    pdf.drawString(40, 740, f"Mobile: {patient[4]}")
+    pdf.drawCentredString(PAGE_WIDTH / 2, TOP - 22, "Dr C Krishnarjuna Rao's Dental Clinic")
+    pdf.drawCentredString(
+        PAGE_WIDTH / 2,
+        TOP - 38,
+        "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006 | Ph: 7794922294"
+    )
 
-    y = 700
+    pdf.line(LEFT, TOP - 50, RIGHT, TOP - 50)
+
+    # -------- PATIENT DETAILS --------
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(LEFT, TOP - 75, "Patient Details")
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(LEFT, TOP - 95, f"Patient Name : {patient[2]}")
+    pdf.drawString(LEFT, TOP - 110, f"Mobile       : {patient[4]}")
+    pdf.drawString(LEFT, TOP - 125, f"City         : {patient[5]}")
+    pdf.drawString(LEFT, TOP - 140, f"Problem      : {patient[6]}")
+
+    # -------- TREATMENT DETAILS --------
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(LEFT, TOP - 165, "Treatment Details")
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(LEFT, TOP - 185, f"Treatment Plan : {treatment[1] if treatment else ''}")
+    pdf.drawString(LEFT, TOP - 200, f"Consultant     : {treatment[3] if treatment else ''}")
+    pdf.drawString(LEFT, TOP - 215, f"Lab Incharge   : {treatment[4] if treatment else ''}")
+    pdf.drawString(LEFT, TOP - 230, f"Final Amount   : {final_amount}")
+
+    # -------- PAYMENTS TABLE --------
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(LEFT, TOP - 260, "Payment Details")
+
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(LEFT, TOP - 280, "Date")
+    pdf.drawString(LEFT + 200, TOP - 280, "Mode")
+    pdf.drawRightString(RIGHT, TOP - 280, "Amount")
+
+    pdf.line(LEFT, TOP - 285, RIGHT, TOP - 285)
+
+    pdf.setFont("Helvetica", 10)
+    y = TOP - 300
+
     for p in payments:
-        pdf.drawString(40, y, f"{p[2]} | {p[4]} | {p[3]}")
+        pdf.drawString(LEFT, y, p[2])
+        pdf.drawString(LEFT + 200, y, p[4])
+        pdf.drawRightString(RIGHT, y, str(p[3]))
         y -= 18
 
-    pdf.drawString(40, y - 20, f"Total: {final_amount}")
-    pdf.drawString(40, y - 40, f"Paid: {total_paid}")
-    pdf.drawString(40, y - 60, f"Balance: {balance}")
+    # -------- TOTALS --------
+    pdf.line(RIGHT - 200, y - 5, RIGHT, y - 5)
+
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawRightString(RIGHT, y - 25, f"Total Amount : {final_amount}")
+    pdf.drawRightString(RIGHT, y - 40, f"Total Paid   : {total_paid}")
+    pdf.drawRightString(RIGHT, y - 55, f"Balance      : {balance}")
+
+    # -------- FOOTER --------
+    pdf.line(LEFT, BOTTOM + 30, RIGHT, BOTTOM + 30)
+
+    pdf.setFont("Helvetica", 9)
+    pdf.drawCentredString(
+        PAGE_WIDTH / 2,
+        BOTTOM + 15,
+        "Thank you for visiting our clinic. Get well soon!"
+    )
 
     pdf.save()
     return send_file(file_name, as_attachment=True)
-
-
-# ---------------- EXPORT ----------------
-@app.route("/export_patients")
-def export_patients():
-    db = get_db()
-    patients = db.execute("SELECT id, appointment_date, name, mobile, city FROM patients").fetchall()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.append(["Date", "Name", "Mobile", "City", "Total", "Paid", "Balance"])
-
-    for p in patients:
-        t = db.execute("SELECT final_amount FROM treatment WHERE patient_id=?", (p[0],)).fetchone()
-        pay = db.execute("SELECT SUM(amount) FROM payments WHERE patient_id=?", (p[0],)).fetchone()
-        total = t[0] if t else 0
-        paid = pay[0] if pay[0] else 0
-        ws.append([p[1], p[2], p[3], p[4], total, paid, total - paid])
-
-    fname = f"patients_{datetime.now().date()}.xlsx"
-    wb.save(fname)
-    return send_file(fname, as_attachment=True)
-
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
