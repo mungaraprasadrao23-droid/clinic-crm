@@ -375,6 +375,45 @@ def invoice(patient_id):
 
     pdf.save()
     return send_file(file_name, as_attachment=True)
+# ---------------- DAILY REPORT ----------------
+@app.route("/report")
+def report():
+    if "user" not in session:
+        return redirect("/login")
+
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT 
+            payment_date,
+            mode,
+            SUM(amount) as total_amount
+        FROM payments
+        GROUP BY payment_date, mode
+        ORDER BY payment_date DESC
+    """).fetchall()
+
+    return render_template("report.html", rows=rows)
+    
+# ---------------- MONTHLY REPORT ----------------
+@app.route("/monthly_report")
+def monthly_report():
+    if "user" not in session:
+        return redirect("/login")
+
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT 
+            strftime('%Y-%m', payment_date) as month,
+            mode,
+            SUM(amount) as total_amount
+        FROM payments
+        GROUP BY month, mode
+        ORDER BY month DESC
+    """).fetchall()
+
+    return render_template("monthly_report.html", rows=rows)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
