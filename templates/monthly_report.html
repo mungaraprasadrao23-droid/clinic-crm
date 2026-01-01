@@ -1,0 +1,20 @@
+<h2>Monthly Payment Report</h2>
+
+<table border="1" cellpadding="8">
+    <tr>
+        <th>Month</th>
+        <th>Payment Mode</th>
+        <th>Total Amount</th>
+    </tr>
+
+    {% for r in rows %}
+    <tr>
+        <td>{{ r[0] }}</td>
+        <td>{{ r[1] }}</td>
+        <td>{{ r[2] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<a href="/report">Back to Daily Report</a>
