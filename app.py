@@ -414,6 +414,48 @@ def monthly_report():
     """).fetchall()
 
     return render_template("monthly_report.html", rows=rows)
+    
+# ---------------- EXPORT PATIENTS TO EXCEL ----------------
+@app.route("/export_patients")
+def export_patients():
+    if "user" not in session:
+        return redirect("/login")
+
+    db = get_db()
+    patients = db.execute("""
+        SELECT 
+            appointment_date,
+            name,
+            patient_type,
+            mobile,
+            city,
+            problem
+        FROM patients
+        ORDER BY appointment_date DESC
+    """).fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Patients"
+
+    # Header
+    ws.append([
+        "Appointment Date",
+        "Name",
+        "Type",
+        "Mobile",
+        "City",
+        "Problem"
+    ])
+
+    # Data
+    for p in patients:
+        ws.append(p)
+
+    file_name = "patients_export.xlsx"
+    wb.save(file_name)
+
+    return send_file(file_name, as_attachment=True)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
