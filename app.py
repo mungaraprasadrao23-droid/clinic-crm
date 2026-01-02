@@ -307,19 +307,40 @@ def invoice(patient_id):
     TOP = PAGE_HEIGHT - 40
     BOTTOM = 40
 
-    # -------- HEADER --------
-    pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawCentredString(PAGE_WIDTH / 2, TOP, "TREATMENT INVOICE")
+    # -------- LETTERHEAD --------
+pdf.setFont("Helvetica-Bold", 20)
+pdf.drawCentredString(
+    PAGE_WIDTH / 2,
+    TOP,
+    "Dr C Krishnarjuna Rao's Dental Clinic"
+)
 
-    pdf.setFont("Helvetica", 10)
-    pdf.drawCentredString(PAGE_WIDTH / 2, TOP - 22, "Dr C Krishnarjuna Rao's Dental Clinic")
-    pdf.drawCentredString(
-        PAGE_WIDTH / 2,
-        TOP - 38,
-        "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006 | Ph: 7794922294"
-    )
+pdf.setFont("Helvetica", 10)
+pdf.drawCentredString(
+    PAGE_WIDTH / 2,
+    TOP - 22,
+    "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006"
+)
 
-    pdf.line(LEFT, TOP - 50, RIGHT, TOP - 50)
+pdf.drawCentredString(
+    PAGE_WIDTH / 2,
+    TOP - 36,
+    "Phone: 7794922294 | Timings: Mon–Sat 10:30 AM – 1:30 PM & 5:30 PM – 8:30 PM"
+)
+
+pdf.setFont("Helvetica-Oblique", 9)
+pdf.drawCentredString(
+    PAGE_WIDTH / 2,
+    TOP - 52,
+    "60+ Years of Dental Excellence"
+)
+
+# Horizontal line
+pdf.line(LEFT, TOP - 60, RIGHT, TOP - 60)
+
+# Move content down after letterhead
+current_y = TOP - 85
+
 
     # -------- PATIENT DETAILS --------
     pdf.setFont("Helvetica-Bold", 11)
