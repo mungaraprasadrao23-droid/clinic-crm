@@ -162,9 +162,9 @@ def patient(patient_id):
     # Save / Update Final Treatment
     if request.method == "POST" and "plan" in request.form:
         db.execute("""
-        INSERT OR REPLACE INTO treatment
-        (patient_id, plan, final_amount, consultant, lab)
-        VALUES (?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO treatment
+            (patient_id, plan, final_amount, consultant, lab)
+            VALUES (?, ?, ?, ?, ?)
         """, (
             patient_id,
             request.form["plan"],
@@ -174,11 +174,11 @@ def patient(patient_id):
         ))
         db.commit()
 
-    # Save Treatment Notes
+    # Save Treatment Note
     if request.method == "POST" and "notes" in request.form:
         db.execute("""
-        INSERT INTO treatment_notes (patient_id, treatment_date, notes)
-        VALUES (?, ?, ?)
+            INSERT INTO treatment_notes (patient_id, treatment_date, notes)
+            VALUES (?, ?, ?)
         """, (
             patient_id,
             request.form["treatment_date"],
@@ -189,8 +189,8 @@ def patient(patient_id):
     # Save Payment
     if request.method == "POST" and "payment_amount" in request.form:
         db.execute("""
-        INSERT INTO payments (patient_id, payment_date, amount, mode)
-        VALUES (?, ?, ?, ?)
+            INSERT INTO payments (patient_id, payment_date, amount, mode)
+            VALUES (?, ?, ?, ?)
         """, (
             patient_id,
             request.form["payment_date"],
@@ -202,7 +202,7 @@ def patient(patient_id):
     patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
     treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
     notes = db.execute("SELECT * FROM treatment_notes WHERE patient_id=? ORDER BY treatment_date", (patient_id,)).fetchall()
-    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=? ORDER BY payment_date", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     paid = sum(p[3] for p in payments)
@@ -214,12 +214,14 @@ def patient(patient_id):
 
     <h3>Final Treatment (Editable)</h3>
     <form method="post">
-        <textarea name="plan">{treatment[1] if treatment else ""}</textarea><br>
-        <input name="amount" value="{final_amount}"><br>
-        <input name="consultant" value="{treatment[3] if treatment else ""}"><br>
-        <input name="lab" value="{treatment[4] if treatment else ""}"><br>
+        <textarea name="plan" rows="3">{treatment[1] if treatment else ""}</textarea><br>
+        <input name="amount" value="{final_amount}" placeholder="Final Amount"><br>
+        <input name="consultant" value="{treatment[3] if treatment else ""}" placeholder="Consultant"><br>
+        <input name="lab" value="{treatment[4] if treatment else ""}" placeholder="Lab"><br>
         <button>Save Treatment</button>
     </form>
+
+    <hr>
 
     <h3>Add Treatment Note</h3>
     <form method="post">
@@ -235,6 +237,8 @@ def patient(patient_id):
         html += f"<p>{n[2]} : {n[3]}</p>"
 
     html += """
+    <hr>
+
     <h3>Add Payment</h3>
     <form method="post">
         <input type="date" name="payment_date" required><br>
@@ -268,7 +272,7 @@ def invoice(patient_id):
     patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
     treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
     notes = db.execute("SELECT * FROM treatment_notes WHERE patient_id=? ORDER BY treatment_date", (patient_id,)).fetchall()
-    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=? ORDER BY payment_date", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     paid = sum(p[3] for p in payments)
@@ -281,36 +285,36 @@ def invoice(patient_id):
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(50, y, "Dr C Krishnarjuna Rao's Dental Clinic")
 
-    y -= 30
+    y -= 25
     pdf.setFont("Helvetica", 10)
     pdf.drawString(50, y, f"Patient: {patient[2]}")
 
     y -= 20
     pdf.drawString(50, y, f"Treatment Plan: {treatment[1] if treatment else ''}")
 
-    y -= 30
+    y -= 25
     pdf.setFont("Helvetica-Bold", 11)
     pdf.drawString(50, y, "Treatment History")
     y -= 15
-
     pdf.setFont("Helvetica", 10)
+
     for n in notes:
         pdf.drawString(50, y, f"{n[2]} - {n[3]}")
         y -= 14
 
-    y -= 20
+    y -= 15
     pdf.setFont("Helvetica-Bold", 11)
     pdf.drawString(50, y, "Payment History")
     y -= 15
-
     pdf.setFont("Helvetica", 10)
+
     for p in payments:
         pdf.drawString(50, y, f"{p[2]} | {p[4]} | {p[3]}")
         y -= 14
 
     y -= 20
     pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(50, y, f"Total: {final_amount}  Paid: {paid}  Balance: {balance}")
+    pdf.drawString(50, y, f"Total: {final_amount}   Paid: {paid}   Balance: {balance}")
 
     pdf.save()
     return send_file(file_name, as_attachment=True)
