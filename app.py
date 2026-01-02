@@ -88,7 +88,7 @@ def login():
         return "Invalid login"
 
     return """
-    <h2>Login</h2>
+    <h2>Clinic Login</h2>
     <form method="post">
         <input name="username" required><br><br>
         <input type="password" name="password" required><br><br>
@@ -151,6 +151,21 @@ def home():
 
     return html
 
+# ---------------- DELETE ROUTES ----------------
+@app.route("/delete_note/<int:note_id>/<int:patient_id>")
+def delete_note(note_id, patient_id):
+    db = get_db()
+    db.execute("DELETE FROM treatment_notes WHERE id=?", (note_id,))
+    db.commit()
+    return redirect(f"/patient/{patient_id}")
+
+@app.route("/delete_payment/<int:payment_id>/<int:patient_id>")
+def delete_payment(payment_id, patient_id):
+    db = get_db()
+    db.execute("DELETE FROM payments WHERE id=?", (payment_id,))
+    db.commit()
+    return redirect(f"/patient/{patient_id}")
+
 # ---------------- PATIENT PAGE ----------------
 @app.route("/patient/<int:patient_id>", methods=["GET", "POST"])
 def patient(patient_id):
@@ -159,7 +174,7 @@ def patient(patient_id):
 
     db = get_db()
 
-    # Save / Update Final Treatment
+    # Final Treatment
     if request.method == "POST" and "plan" in request.form:
         db.execute("""
             INSERT OR REPLACE INTO treatment
@@ -174,7 +189,7 @@ def patient(patient_id):
         ))
         db.commit()
 
-    # Save Treatment Note
+    # Treatment Notes
     if request.method == "POST" and "notes" in request.form:
         db.execute("""
             INSERT INTO treatment_notes (patient_id, treatment_date, notes)
@@ -186,7 +201,7 @@ def patient(patient_id):
         ))
         db.commit()
 
-    # Save Payment
+    # Payments
     if request.method == "POST" and "payment_amount" in request.form:
         db.execute("""
             INSERT INTO payments (patient_id, payment_date, amount, mode)
@@ -201,8 +216,8 @@ def patient(patient_id):
 
     patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
     treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
-    notes = db.execute("SELECT * FROM treatment_notes WHERE patient_id=? ORDER BY treatment_date", (patient_id,)).fetchall()
-    payments = db.execute("SELECT * FROM payments WHERE patient_id=? ORDER BY payment_date", (patient_id,)).fetchall()
+    notes = db.execute("SELECT * FROM treatment_notes WHERE patient_id=?", (patient_id,)).fetchall()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     paid = sum(p[3] for p in payments)
@@ -212,50 +227,24 @@ def patient(patient_id):
     <h2>{patient[2]}</h2>
     <a href="/">⬅ Back</a><br><br>
 
-    <h3>Final Treatment (Editable)</h3>
-    <form method="post">
-        <textarea name="plan" rows="3">{treatment[1] if treatment else ""}</textarea><br>
-        <input name="amount" value="{final_amount}" placeholder="Final Amount"><br>
-        <input name="consultant" value="{treatment[3] if treatment else ""}" placeholder="Consultant"><br>
-        <input name="lab" value="{treatment[4] if treatment else ""}" placeholder="Lab"><br>
-        <button>Save Treatment</button>
-    </form>
-
-    <hr>
-
-    <h3>Add Treatment Note</h3>
-    <form method="post">
-        <input type="date" name="treatment_date" required><br>
-        <textarea name="notes" required></textarea><br>
-        <button>Add Note</button>
-    </form>
-
     <h3>Treatment History</h3>
     """
 
     for n in notes:
-        html += f"<p>{n[2]} : {n[3]}</p>"
+        html += f"""
+        <p>{n[2]} - {n[3]}
+        <a href="/delete_note/{n[0]}/{patient_id}">❌</a></p>
+        """
 
     html += """
-    <hr>
-
-    <h3>Add Payment</h3>
-    <form method="post">
-        <input type="date" name="payment_date" required><br>
-        <input name="payment_amount" required><br>
-        <select name="payment_mode">
-            <option>Cash</option>
-            <option>UPI</option>
-            <option>Card</option>
-        </select><br>
-        <button>Add Payment</button>
-    </form>
-
     <h3>Payment History</h3>
     """
 
     for p in payments:
-        html += f"<p>{p[2]} | {p[4]} | {p[3]}</p>"
+        html += f"""
+        <p>{p[2]} | {p[4]} | {p[3]}
+        <a href="/delete_payment/{p[0]}/{patient_id}">❌</a></p>
+        """
 
     html += f"""
     <p><b>Total:</b> {final_amount} | <b>Paid:</b> {paid} | <b>Balance:</b> {balance}</p>
@@ -264,36 +253,43 @@ def patient(patient_id):
 
     return html
 
-# ---------------- INVOICE ----------------
+# ---------------- PROFESSIONAL INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
 def invoice(patient_id):
     db = get_db()
 
     patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
     treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
-    notes = db.execute("SELECT * FROM treatment_notes WHERE patient_id=? ORDER BY treatment_date", (patient_id,)).fetchall()
-    payments = db.execute("SELECT * FROM payments WHERE patient_id=? ORDER BY payment_date", (patient_id,)).fetchall()
+    notes = db.execute("SELECT * FROM treatment_notes WHERE patient_id=?", (patient_id,)).fetchall()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     paid = sum(p[3] for p in payments)
     balance = final_amount - paid
 
     file_name = f"invoice_{patient_id}.pdf"
-    pdf = canvas.Canvas(file_name)
+    pdf = canvas.Canvas(file_name, pagesize=(595, 842))
 
     y = 800
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, y, "Dr C Krishnarjuna Rao's Dental Clinic")
+    pdf.setFont("Helvetica-Bold", 18)
+    pdf.drawCentredString(297, y, "Dr C Krishnarjuna Rao's Dental Clinic")
 
     y -= 25
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(50, y, f"Patient: {patient[2]}")
+    pdf.drawCentredString(297, y, "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur - 522006")
+    y -= 15
+    pdf.drawCentredString(297, y, "Phone: 7794922294 | 60+ Years of Dental Excellence")
 
-    y -= 20
-    pdf.drawString(50, y, f"Treatment Plan: {treatment[1] if treatment else ''}")
+    y -= 30
+    pdf.line(40, y, 555, y)
 
     y -= 25
-    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, y, f"Patient Name: {patient[2]}")
+    y -= 15
+    pdf.drawString(50, y, f"Mobile: {patient[4]}")
+
+    y -= 25
+    pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(50, y, "Treatment History")
     y -= 15
     pdf.setFont("Helvetica", 10)
@@ -303,7 +299,7 @@ def invoice(patient_id):
         y -= 14
 
     y -= 15
-    pdf.setFont("Helvetica-Bold", 11)
+    pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(50, y, "Payment History")
     y -= 15
     pdf.setFont("Helvetica", 10)
