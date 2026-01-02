@@ -52,6 +52,14 @@ def init_db():
         mode TEXT
     )
     """)
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS treatment_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER,
+        treatment_date TEXT,
+        notes TEXT
+    )
+    """)
 
     db.commit()
 
