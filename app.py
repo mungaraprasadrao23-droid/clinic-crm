@@ -200,83 +200,64 @@ def patient(patient_id):
 
     db = get_db()
 
-    if request.method == "POST" and "plan" in request.form:
-        db.execute("""
-        INSERT OR REPLACE INTO treatment
-        (patient_id, plan, final_amount, consultant, lab)
-        VALUES (?, ?, ?, ?, ?)
-        """, (
-            patient_id,
-            request.form["plan"],
-            request.form["amount"],
-            request.form["consultant"],
-            request.form["lab"]
-        ))
-        db.commit()
+    patient = db.execute(
+        "SELECT * FROM patients WHERE id=?", (patient_id,)
+    ).fetchone()
 
-    if request.method == "POST" and "payment_amount" in request.form:
-        db.execute("""
-        INSERT INTO payments (patient_id, payment_date, amount, mode)
-        VALUES (?, ?, ?, ?)
-        """, (
-            patient_id,
-            request.form["payment_date"],
-            request.form["payment_amount"],
-            request.form["payment_mode"]
-        ))
-        db.commit()
+    treatment = db.execute(
+        "SELECT * FROM treatment WHERE patient_id=?", (patient_id,)
+    ).fetchone()
 
-    patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
-    treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
-    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
+    payments = db.execute(
+        "SELECT * FROM payments WHERE patient_id=?", (patient_id,)
+    ).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
     html = f"""
-<h2>{patient[2]}</h2>
-<a href="/">⬅ Back</a><br><br>
+    <h2>{patient[2]}</h2>
+    <a href="/">⬅ Back</a><br><br>
 
-<h3>Treatment Details</h3>
-<p><b>Treatment Plan:</b> {treatment[1] if treatment else 'Not added'}</p>
-<p><b>Final Amount:</b> {final_amount}</p>
-<p><b>Consultant:</b> {treatment[3] if treatment else ''}</p>
-<p><b>Lab:</b> {treatment[4] if treatment else ''}</p>
+    <h3>Treatment Details</h3>
+    <p><b>Treatment Plan:</b> {treatment[1] if treatment else 'Not added'}</p>
+    <p><b>Final Amount:</b> {final_amount}</p>
+    <p><b>Consultant:</b> {treatment[3] if treatment else ''}</p>
+    <p><b>Lab:</b> {treatment[4] if treatment else ''}</p>
 
-<h3>Payment History</h3>
-<table border="1" cellpadding="6">
-<tr>
-<th>Date</th>
-<th>Mode</th>
-<th>Amount</th>
-</tr>
-"""
-
-for p in payments:
-    html += f"""
+    <h3>Payment History</h3>
+    <table border="1" cellpadding="6">
     <tr>
-        <td>{p[2]}</td>
-        <td>{p[4]}</td>
-        <td>{p[3]}</td>
+        <th>Date</th>
+        <th>Mode</th>
+        <th>Amount</th>
     </tr>
     """
 
-html += f"""
-</table>
+    for p in payments:
+        html += f"""
+        <tr>
+            <td>{p[2]}</td>
+            <td>{p[4]}</td>
+            <td>{p[3]}</td>
+        </tr>
+        """
 
-<br>
-<p>
-<b>Total Amount:</b> {final_amount}<br>
-<b>Paid Amount:</b> {total_paid}<br>
-<b>Balance Amount:</b> {balance}
-</p>
+    html += f"""
+    </table>
+    <br>
 
-<a href="/invoice/{patient_id}">🧾 Download Invoice</a>
-"""
+    <p>
+    <b>Total:</b> {final_amount}<br>
+    <b>Paid:</b> {total_paid}<br>
+    <b>Balance:</b> {balance}
+    </p>
 
-return html
+    <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
+    """
 
+    return html
 
 # ---------------- INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
