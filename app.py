@@ -415,47 +415,54 @@ def monthly_report():
 
     return render_template("monthly_report.html", rows=rows)
     
-# ---------------- EXPORT PATIENTS TO EXCEL ----------------
+# ---------------- EXPORT PATIENTS WITH BALANCE TO EXCEL ----------------
 @app.route("/export_patients")
 def export_patients():
     if "user" not in session:
         return redirect("/login")
 
     db = get_db()
-    patients = db.execute("""
-        SELECT 
-            appointment_date,
-            name,
-            patient_type,
-            mobile,
-            city,
-            problem
-        FROM patients
-        ORDER BY appointment_date DESC
+
+    rows = db.execute("""
+        SELECT
+            p.appointment_date,
+            p.name,
+            p.mobile,
+            p.city,
+            IFNULL(t.final_amount, 0) AS total_amount,
+            IFNULL(SUM(pay.amount), 0) AS paid_amount,
+            IFNULL(t.final_amount, 0) - IFNULL(SUM(pay.amount), 0) AS balance
+        FROM patients p
+        LEFT JOIN treatment t ON p.id = t.patient_id
+        LEFT JOIN payments pay ON p.id = pay.patient_id
+        GROUP BY p.id
+        ORDER BY p.appointment_date DESC
     """).fetchall()
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Patients"
+    ws.title = "Patient Summary"
 
     # Header
     ws.append([
         "Appointment Date",
-        "Name",
-        "Type",
+        "Patient Name",
         "Mobile",
         "City",
-        "Problem"
+        "Total Amount",
+        "Paid Amount",
+        "Balance Amount"
     ])
 
     # Data
-    for p in patients:
-        ws.append(p)
+    for r in rows:
+        ws.append(r)
 
-    file_name = "patients_export.xlsx"
+    file_name = "patient_summary.xlsx"
     wb.save(file_name)
 
     return send_file(file_name, as_attachment=True)
+
 # ---------------- EXPORT PAYMENTS TO EXCEL ----------------
 @app.route("/export_payments")
 def export_payments():
