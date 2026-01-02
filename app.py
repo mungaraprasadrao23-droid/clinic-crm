@@ -504,6 +504,64 @@ def export_payments():
     wb.save(file_name)
 
     return send_file(file_name, as_attachment=True)
+# ---------------- PAYMENT EXPORT DATE WISE ----------------
+@app.route("/export_payments_date", methods=["GET", "POST"])
+def export_payments_date():
+    if "user" not in session:
+        return redirect("/login")
+
+    if request.method == "GET":
+        return """
+        <h2>Export Payments (Date Wise)</h2>
+        <form method="post">
+            <label>From Date:</label><br>
+            <input type="date" name="from_date" required><br><br>
+
+            <label>To Date:</label><br>
+            <input type="date" name="to_date" required><br><br>
+
+            <button>Download Excel</button>
+        </form>
+        <br>
+        <a href="/">⬅ Back</a>
+        """
+
+    from_date = request.form["from_date"]
+    to_date = request.form["to_date"]
+
+    db = get_db()
+    rows = db.execute("""
+        SELECT
+            patients.name,
+            patients.mobile,
+            payments.payment_date,
+            payments.mode,
+            payments.amount
+        FROM payments
+        JOIN patients ON patients.id = payments.patient_id
+        WHERE payments.payment_date BETWEEN ? AND ?
+        ORDER BY payments.payment_date
+    """, (from_date, to_date)).fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Payments"
+
+    ws.append([
+        "Patient Name",
+        "Mobile",
+        "Payment Date",
+        "Payment Mode",
+        "Amount"
+    ])
+
+    for r in rows:
+        ws.append(r)
+
+    file_name = f"payments_{from_date}_to_{to_date}.xlsx"
+    wb.save(file_name)
+
+    return send_file(file_name, as_attachment=True)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
