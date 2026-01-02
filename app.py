@@ -187,7 +187,13 @@ def home():
         </div>
         """
 
-    html += "<br><a href='/export_patients'>Export Excel</a>"
+    html += """
+<br><br>
+<a href='/export_patients'>Export Patients Summary</a><br>
+<a href='/export_payments'>Export All Payments</a><br>
+<a href='/export_payments_date'>Export Payments (Date Wise)</a>
+"""
+
     return html
 
 
