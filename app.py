@@ -234,13 +234,49 @@ def patient(patient_id):
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
-    return f"""
-    <h2>{patient[2]}</h2>
-    <a href="/">⬅ Back</a><br><br>
+    html = f"""
+<h2>{patient[2]}</h2>
+<a href="/">⬅ Back</a><br><br>
 
-    <p>Total: {final_amount} | Paid: {total_paid} | Balance: {balance}</p>
-    <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
+<h3>Treatment Details</h3>
+<p><b>Treatment Plan:</b> {treatment[1] if treatment else 'Not added'}</p>
+<p><b>Final Amount:</b> {final_amount}</p>
+<p><b>Consultant:</b> {treatment[3] if treatment else ''}</p>
+<p><b>Lab:</b> {treatment[4] if treatment else ''}</p>
+
+<h3>Payment History</h3>
+<table border="1" cellpadding="6">
+<tr>
+<th>Date</th>
+<th>Mode</th>
+<th>Amount</th>
+</tr>
+"""
+
+for p in payments:
+    html += f"""
+    <tr>
+        <td>{p[2]}</td>
+        <td>{p[4]}</td>
+        <td>{p[3]}</td>
+    </tr>
     """
+
+html += f"""
+</table>
+
+<br>
+<p>
+<b>Total Amount:</b> {final_amount}<br>
+<b>Paid Amount:</b> {total_paid}<br>
+<b>Balance Amount:</b> {balance}
+</p>
+
+<a href="/invoice/{patient_id}">🧾 Download Invoice</a>
+"""
+
+return html
+
 
 # ---------------- INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
