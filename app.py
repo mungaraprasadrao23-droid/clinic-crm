@@ -314,6 +314,19 @@ def patient(patient_id):
     </table>
 
     <hr>
+    
+    html += """
+    <h3>Payment History</h3>
+    <table border="1" cellpadding="6">
+    <tr>
+        <th>Date</th>
+        <th>Mode</th>
+        <th>Amount</th>
+    </tr>
+    """
+
+        html += "</table><br>"
+
 
     <h3>Payment Summary</h3>
     <p>
