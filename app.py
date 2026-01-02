@@ -252,20 +252,81 @@ def patient(patient_id):
         </tr>
         """
 
+        html = f"""
+    <h2>{patient[2]}</h2>
+    <a href="/">⬅ Back</a><br><br>
+
+    <h3>Final Treatment (Editable)</h3>
+    <form method="post">
+        <textarea name="plan" placeholder="Treatment Plan" rows="3" cols="50">{treatment[1] if treatment else ""}</textarea><br><br>
+
+        <input name="amount" placeholder="Final Amount" value="{final_amount}"><br><br>
+        <input name="consultant" placeholder="Consultant" value="{treatment[3] if treatment else ""}"><br><br>
+        <input name="lab" placeholder="Lab" value="{treatment[4] if treatment else ""}"><br><br>
+        <input name="crown" placeholder="Type of Crown"><br><br>
+
+        <button>Save / Update Treatment</button>
+    </form>
+
+    <hr>
+
+    <h3>Add Treatment Update (Date Wise)</h3>
+    <form method="post">
+        <input type="date" name="treatment_date" required><br><br>
+        <textarea name="notes" placeholder="Treatment details / comments" rows="3" cols="50" required></textarea><br><br>
+        <button>Add Treatment Note</button>
+    </form>
+
+    <hr>
+
+    <h3>Treatment History</h3>
+    <table border="1" cellpadding="6">
+    <tr>
+        <th>Date</th>
+        <th>Notes</th>
+    </tr>
+    """
+    if request.method == "POST" and "treatment_date" in request.form:
+        db.execute("""
+            INSERT INTO treatment_notes (patient_id, treatment_date, notes)
+            VALUES (?, ?, ?)
+        """, (
+            patient_id,
+            request.form["treatment_date"],
+            request.form["notes"]
+        ))
+        db.commit()
+
+    notes = db.execute(
+        "SELECT treatment_date, notes FROM treatment_notes WHERE patient_id=? ORDER BY treatment_date",
+        (patient_id,)
+    ).fetchall()
+
+    for n in notes:
+        html += f"""
+        <tr>
+            <td>{n[0]}</td>
+            <td>{n[1]}</td>
+        </tr>
+        """
+
     html += f"""
     </table>
-    <br>
 
+    <hr>
+
+    <h3>Payment Summary</h3>
     <p>
-    <b>Total:</b> {final_amount}<br>
-    <b>Paid:</b> {total_paid}<br>
-    <b>Balance:</b> {balance}
+    Total: {final_amount}<br>
+    Paid: {total_paid}<br>
+    Balance: {balance}
     </p>
 
     <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
     """
 
     return html
+
 
 # ---------------- INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
