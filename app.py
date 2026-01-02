@@ -1,9 +1,8 @@
-from flask import Flask, request, send_file, redirect, session
+from flask import Flask, request, send_file, redirect, session, render_template
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from reportlab.pdfgen import canvas
 from openpyxl import Workbook
-from datetime import datetime
 import os
 
 # ---------------- DATABASE ----------------
@@ -67,14 +66,12 @@ def init_admin():
     db.commit()
 
 
-# ---------------- INIT ----------------
 init_db()
 init_admin()
 
 # ---------------- APP ----------------
 app = Flask(__name__)
 app.secret_key = "clinic-secret-key"
-
 
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
@@ -112,7 +109,6 @@ def login():
 def logout():
     session.clear()
     return redirect("/login")
-
 
 # ---------------- HOME ----------------
 @app.route("/", methods=["GET", "POST"])
@@ -188,14 +184,13 @@ def home():
         """
 
     html += """
-<br><br>
-<a href='/export_patients'>Export Patients Summary</a><br>
-<a href='/export_payments'>Export All Payments</a><br>
-<a href='/export_payments_date'>Export Payments (Date Wise)</a>
-"""
+    <br><br>
+    <a href='/export_patients'>Export Patients Summary</a><br>
+    <a href='/export_payments'>Export All Payments</a><br>
+    <a href='/export_payments_date'>Export Payments (Date Wise)</a>
+    """
 
     return html
-
 
 # ---------------- PATIENT ----------------
 @app.route("/patient/<int:patient_id>", methods=["GET", "POST"])
@@ -239,36 +234,13 @@ def patient(patient_id):
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
-    html = f"""
+    return f"""
     <h2>{patient[2]}</h2>
     <a href="/">⬅ Back</a><br><br>
-
-    <h3>Treatment</h3>
-    <form method="post">
-        <textarea name="plan">{treatment[1] if treatment else ""}</textarea><br><br>
-        <input name="amount" value="{final_amount}"><br><br>
-        <input name="consultant" placeholder="Consultant"><br><br>
-        <input name="lab" placeholder="Lab"><br><br>
-        <button>Save Treatment</button>
-    </form>
-
-    <h3>Add Payment</h3>
-    <form method="post">
-        <input type="date" name="payment_date" required><br><br>
-        <input name="payment_amount" required><br><br>
-        <select name="payment_mode">
-            <option>Cash</option>
-            <option>UPI</option>
-            <option>Card</option>
-        </select><br><br>
-        <button>Add Payment</button>
-    </form>
 
     <p>Total: {final_amount} | Paid: {total_paid} | Balance: {balance}</p>
     <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
     """
-    return html
-
 
 # ---------------- INVOICE ----------------
 @app.route("/invoice/<int:patient_id>")
@@ -277,317 +249,48 @@ def invoice(patient_id):
         return redirect("/login")
 
     db = get_db()
-
-    patient = db.execute(
-        "SELECT * FROM patients WHERE id=?",
-        (patient_id,)
-    ).fetchone()
-
-    treatment = db.execute(
-        "SELECT * FROM treatment WHERE patient_id=?",
-        (patient_id,)
-    ).fetchone()
-
-    payments = db.execute(
-        "SELECT * FROM payments WHERE patient_id=?",
-        (patient_id,)
-    ).fetchall()
+    patient = db.execute("SELECT * FROM patients WHERE id=?", (patient_id,)).fetchone()
+    treatment = db.execute("SELECT * FROM treatment WHERE patient_id=?", (patient_id,)).fetchone()
+    payments = db.execute("SELECT * FROM payments WHERE patient_id=?", (patient_id,)).fetchall()
 
     final_amount = treatment[2] if treatment else 0
     total_paid = sum(p[3] for p in payments) if payments else 0
     balance = final_amount - total_paid
 
     file_name = f"invoice_{patient_id}.pdf"
-    pdf = canvas.Canvas(file_name, pagesize=(595, 842))  # A4
+    pdf = canvas.Canvas(file_name, pagesize=(595, 842))
 
-    PAGE_WIDTH = 595
-    PAGE_HEIGHT = 842
-    LEFT = 40
-    RIGHT = PAGE_WIDTH - 40
-    TOP = PAGE_HEIGHT - 40
-    BOTTOM = 40
+    LEFT, RIGHT, TOP = 40, 555, 802
 
     # -------- LETTERHEAD --------
-pdf.setFont("Helvetica-Bold", 20)
-pdf.drawCentredString(
-    PAGE_WIDTH / 2,
-    TOP,
-    "Dr C Krishnarjuna Rao's Dental Clinic"
-)
-
-pdf.setFont("Helvetica", 10)
-pdf.drawCentredString(
-    PAGE_WIDTH / 2,
-    TOP - 22,
-    "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006"
-)
-
-pdf.drawCentredString(
-    PAGE_WIDTH / 2,
-    TOP - 36,
-    "Phone: 7794922294 | Timings: Mon–Sat 10:30 AM – 1:30 PM & 5:30 PM – 8:30 PM"
-)
-
-pdf.setFont("Helvetica-Oblique", 9)
-pdf.drawCentredString(
-    PAGE_WIDTH / 2,
-    TOP - 52,
-    "60+ Years of Dental Excellence"
-)
-
-# Horizontal line
-pdf.line(LEFT, TOP - 60, RIGHT, TOP - 60)
-
-# Move content down after letterhead
-current_y = TOP - 85
-
-
-    # -------- PATIENT DETAILS --------
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(LEFT, TOP - 75, "Patient Details")
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawCentredString(297, TOP, "Dr C Krishnarjuna Rao's Dental Clinic")
 
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(LEFT, TOP - 95, f"Patient Name : {patient[2]}")
-    pdf.drawString(LEFT, TOP - 110, f"Mobile       : {patient[4]}")
-    pdf.drawString(LEFT, TOP - 125, f"City         : {patient[5]}")
-    pdf.drawString(LEFT, TOP - 140, f"Problem      : {patient[6]}")
+    pdf.drawCentredString(297, TOP - 22, "Krishna Nagar 2nd Lane, Opp NTR Statue, Guntur – 522006")
+    pdf.drawCentredString(297, TOP - 36, "Phone: 7794922294 | Timings: Mon–Sat 10:30 AM – 1:30 PM & 5:30 PM – 8:30 PM")
 
-    # -------- TREATMENT DETAILS --------
+    pdf.setFont("Helvetica-Oblique", 9)
+    pdf.drawCentredString(297, TOP - 52, "60+ Years of Dental Excellence")
+
+    pdf.line(LEFT, TOP - 60, RIGHT, TOP - 60)
+
+    y = TOP - 90
+
     pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(LEFT, TOP - 165, "Treatment Details")
+    pdf.drawString(LEFT, y, "Patient Details")
+    y -= 20
 
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(LEFT, TOP - 185, f"Treatment Plan : {treatment[1] if treatment else ''}")
-    pdf.drawString(LEFT, TOP - 200, f"Consultant     : {treatment[3] if treatment else ''}")
-    pdf.drawString(LEFT, TOP - 215, f"Lab Incharge   : {treatment[4] if treatment else ''}")
-    pdf.drawString(LEFT, TOP - 230, f"Final Amount   : {final_amount}")
-
-    # -------- PAYMENTS TABLE --------
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(LEFT, TOP - 260, "Payment Details")
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(LEFT, TOP - 280, "Date")
-    pdf.drawString(LEFT + 200, TOP - 280, "Mode")
-    pdf.drawRightString(RIGHT, TOP - 280, "Amount")
-
-    pdf.line(LEFT, TOP - 285, RIGHT, TOP - 285)
-
-    pdf.setFont("Helvetica", 10)
-    y = TOP - 300
-
-    for p in payments:
-        pdf.drawString(LEFT, y, p[2])
-        pdf.drawString(LEFT + 200, y, p[4])
-        pdf.drawRightString(RIGHT, y, str(p[3]))
-        y -= 18
-
-    # -------- TOTALS --------
-    pdf.line(RIGHT - 200, y - 5, RIGHT, y - 5)
-
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawRightString(RIGHT, y - 25, f"Total Amount : {final_amount}")
-    pdf.drawRightString(RIGHT, y - 40, f"Total Paid   : {total_paid}")
-    pdf.drawRightString(RIGHT, y - 55, f"Balance      : {balance}")
-
-    # -------- FOOTER --------
-    pdf.line(LEFT, BOTTOM + 30, RIGHT, BOTTOM + 30)
-
-    pdf.setFont("Helvetica", 9)
-    pdf.drawCentredString(
-        PAGE_WIDTH / 2,
-        BOTTOM + 15,
-        "Thank you for visiting our clinic. Get well soon!"
-    )
+    pdf.drawString(LEFT, y, f"Name: {patient[2]}")
+    y -= 15
+    pdf.drawString(LEFT, y, f"Mobile: {patient[4]}")
+    y -= 15
+    pdf.drawString(LEFT, y, f"City: {patient[5]}")
+    y -= 15
+    pdf.drawString(LEFT, y, f"Problem: {patient[6]}")
 
     pdf.save()
-    return send_file(file_name, as_attachment=True)
-# ---------------- DAILY REPORT ----------------
-@app.route("/report")
-def report():
-    if "user" not in session:
-        return redirect("/login")
-
-    db = get_db()
-
-    rows = db.execute("""
-        SELECT 
-            payment_date,
-            mode,
-            SUM(amount) as total_amount
-        FROM payments
-        GROUP BY payment_date, mode
-        ORDER BY payment_date DESC
-    """).fetchall()
-
-    return render_template("report.html", rows=rows)
-    
-# ---------------- MONTHLY REPORT ----------------
-@app.route("/monthly_report")
-def monthly_report():
-    if "user" not in session:
-        return redirect("/login")
-
-    db = get_db()
-
-    rows = db.execute("""
-        SELECT 
-            strftime('%Y-%m', payment_date) as month,
-            mode,
-            SUM(amount) as total_amount
-        FROM payments
-        GROUP BY month, mode
-        ORDER BY month DESC
-    """).fetchall()
-
-    return render_template("monthly_report.html", rows=rows)
-    
-# ---------------- EXPORT PATIENTS WITH BALANCE TO EXCEL ----------------
-@app.route("/export_patients")
-def export_patients():
-    if "user" not in session:
-        return redirect("/login")
-
-    db = get_db()
-
-    rows = db.execute("""
-        SELECT
-            p.appointment_date,
-            p.name,
-            p.mobile,
-            p.city,
-            IFNULL(t.final_amount, 0) AS total_amount,
-            IFNULL(SUM(pay.amount), 0) AS paid_amount,
-            IFNULL(t.final_amount, 0) - IFNULL(SUM(pay.amount), 0) AS balance
-        FROM patients p
-        LEFT JOIN treatment t ON p.id = t.patient_id
-        LEFT JOIN payments pay ON p.id = pay.patient_id
-        GROUP BY p.id
-        ORDER BY p.appointment_date DESC
-    """).fetchall()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Patient Summary"
-
-    # Header
-    ws.append([
-        "Appointment Date",
-        "Patient Name",
-        "Mobile",
-        "City",
-        "Total Amount",
-        "Paid Amount",
-        "Balance Amount"
-    ])
-
-    # Data
-    for r in rows:
-        ws.append(r)
-
-    file_name = "patient_summary.xlsx"
-    wb.save(file_name)
-
-    return send_file(file_name, as_attachment=True)
-
-# ---------------- EXPORT PAYMENTS TO EXCEL ----------------
-@app.route("/export_payments")
-def export_payments():
-    if "user" not in session:
-        return redirect("/login")
-
-    db = get_db()
-
-    rows = db.execute("""
-        SELECT
-            patients.name,
-            patients.mobile,
-            payments.payment_date,
-            payments.mode,
-            payments.amount
-        FROM payments
-        JOIN patients ON patients.id = payments.patient_id
-        ORDER BY payments.payment_date DESC
-    """).fetchall()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Payments"
-
-    # Header row
-    ws.append([
-        "Patient Name",
-        "Mobile",
-        "Payment Date",
-        "Payment Mode",
-        "Amount Paid"
-    ])
-
-    # Data rows
-    for r in rows:
-        ws.append(r)
-
-    file_name = "payment_report.xlsx"
-    wb.save(file_name)
-
-    return send_file(file_name, as_attachment=True)
-# ---------------- PAYMENT EXPORT DATE WISE ----------------
-@app.route("/export_payments_date", methods=["GET", "POST"])
-def export_payments_date():
-    if "user" not in session:
-        return redirect("/login")
-
-    if request.method == "GET":
-        return """
-        <h2>Export Payments (Date Wise)</h2>
-        <form method="post">
-            <label>From Date:</label><br>
-            <input type="date" name="from_date" required><br><br>
-
-            <label>To Date:</label><br>
-            <input type="date" name="to_date" required><br><br>
-
-            <button>Download Excel</button>
-        </form>
-        <br>
-        <a href="/">⬅ Back</a>
-        """
-
-    from_date = request.form["from_date"]
-    to_date = request.form["to_date"]
-
-    db = get_db()
-    rows = db.execute("""
-        SELECT
-            patients.name,
-            patients.mobile,
-            payments.payment_date,
-            payments.mode,
-            payments.amount
-        FROM payments
-        JOIN patients ON patients.id = payments.patient_id
-        WHERE payments.payment_date BETWEEN ? AND ?
-        ORDER BY payments.payment_date
-    """, (from_date, to_date)).fetchall()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Payments"
-
-    ws.append([
-        "Patient Name",
-        "Mobile",
-        "Payment Date",
-        "Payment Mode",
-        "Amount"
-    ])
-
-    for r in rows:
-        ws.append(r)
-
-    file_name = f"payments_{from_date}_to_{to_date}.xlsx"
-    wb.save(file_name)
-
     return send_file(file_name, as_attachment=True)
 
 # ---------------- RUN ----------------
