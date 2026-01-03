@@ -233,7 +233,7 @@ def patient(patient_id):
     <form method="post" action="/edit_note/{n[0]}/{patient_id}">
         <input type="date" name="treatment_date" value="{n[2]}" required>
         <input name="notes" value="{n[3]}" size="60">
-        <button>✏ Save</button>
+        <button>Save</button>
         <a href="/delete_note/{n[0]}/{patient_id}">Delete</a>
     </form>
     <br>
