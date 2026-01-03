@@ -234,7 +234,7 @@ def patient(patient_id):
         <input type="date" name="treatment_date" value="{n[2]}" required>
         <input name="notes" value="{n[3]}" size="60">
         <button>✏ Save</button>
-        <a href="/delete_note/{n[0]}/{patient_id}">❌ Delete</a>
+        <a href="/delete_note/{n[0]}/{patient_id}">Delete</a>
     </form>
     <br>
     """
@@ -261,12 +261,12 @@ def edit_note(note_id, patient_id):
     for p in payments:
         html += f"""
         <p>{p[2]} | {p[4]} | {p[3]}
-        <a href="/delete_payment/{p[0]}/{patient_id}">❌</a></p>
+        <a href="/delete_payment/{p[0]}/{patient_id}"></a></p>
         """
 
     html += f"""
     <p><b>Total:</b> {final_amount} | <b>Paid:</b> {paid} | <b>Balance:</b> {balance}</p>
-    <a href="/invoice/{patient_id}">🧾 Download Invoice</a>
+    <a href="/invoice/{patient_id}">Download Invoice</a>
     """
 
     return html
