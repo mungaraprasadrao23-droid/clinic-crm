@@ -223,18 +223,36 @@ def patient(patient_id):
     paid = sum(p[3] for p in payments)
     balance = final_amount - paid
 
-    html = f"""
     <h2>{patient[2]}</h2>
-    <a href="/">⬅ Back</a><br><br>
 
     <h3>Treatment History</h3>
     """
 
     for n in notes:
-        html += f"""
-        <p>{n[2]} - {n[3]}
-        <a href="/delete_note/{n[0]}/{patient_id}">❌</a></p>
-        """
+    html += f"""
+    <form method="post" action="/edit_note/{n[0]}/{patient_id}">
+        <input type="date" name="treatment_date" value="{n[2]}" required>
+        <input name="notes" value="{n[3]}" size="60">
+        <button>✏ Save</button>
+        <a href="/delete_note/{n[0]}/{patient_id}">❌ Delete</a>
+    </form>
+    <br>
+    """
+@app.route("/edit_note/<int:note_id>/<int:patient_id>", methods=["POST"])
+def edit_note(note_id, patient_id):
+    db = get_db()
+    db.execute("""
+        UPDATE treatment_notes
+        SET treatment_date=?, notes=?
+        WHERE id=?
+    """, (
+        request.form["treatment_date"],
+        request.form["notes"],
+        note_id
+    ))
+    db.commit()
+    return redirect(f"/patient/{patient_id}")
+
 
     html += """
     <h3>Payment History</h3>
